@@ -6,7 +6,7 @@ A personal rehab log for an evolving ACL programme. Use it on the gym floor to s
 
 - Password gate (one shared password stored in Vercel)
 - Active programme with warm-ups and working lifts
-- In-session logging: type the kg and reps you actually did, see the live set list, add extra sets, undo a mistype, and switch sides without leaving the lift
+- In-session logging: type the kg and reps you actually did, see the live set list, add extra sets, undo a mistype, and alternate left/right on bilateral lifts
 - Last-used weight and reps prefilled for the next session
 - 48-hour gap and twice-weekly frequency on the home screen
 - Programme editor so exercises, targets, and notes can change over time
@@ -51,4 +51,4 @@ Login works without Supabase. The home screen will ask you to connect the databa
 npm test
 ```
 
-Covers the password gate, session-token signing, last-weight prefill, workout stepper (warm-up → left → right → done), and the 48-hour / weekly frequency helper.
+Covers the password gate, session-token signing, last-weight prefill, workout stepper (warm-up → left/right alternating → done), and the 48-hour / weekly frequency helper.

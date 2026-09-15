@@ -41,6 +41,20 @@ export function isExerciseComplete(
   );
 }
 
+export function nextAlternatingSide(
+  item: ProgrammeExercise,
+  logs: Pick<SetLog, "programmeExerciseId" | "side">[],
+  pendingSide?: Side,
+): Side {
+  const sides = sidesFor(item);
+  if (sides.length === 1) return sides[0];
+
+  const count = (side: Side) =>
+    setsLoggedFor(logs, item.id, side) + (pendingSide === side ? 1 : 0);
+
+  return count("left") <= count("right") ? "left" : "right";
+}
+
 export function getWorkoutStep(
   items: ProgrammeExercise[],
   logs: Pick<SetLog, "programmeExerciseId" | "side">[],
@@ -57,17 +71,13 @@ export function getWorkoutStep(
 
   for (const item of ordered.filter((entry) => !entry.isWarmup)) {
     if (isExerciseComplete(item, logs)) continue;
-    for (const side of sidesFor(item)) {
-      const done = setsLoggedFor(logs, item.id, side);
-      if (done < targetSetsFor(item)) {
-        return {
-          kind: "work",
-          item,
-          side,
-          setNumber: done + 1,
-        };
-      }
-    }
+    const side = nextAlternatingSide(item, logs);
+    return {
+      kind: "work",
+      item,
+      side,
+      setNumber: setsLoggedFor(logs, item.id, side) + 1,
+    };
   }
 
   return { kind: "complete" };

@@ -6,6 +6,7 @@ import {
   getWorkoutStep,
   lastRepsForExercise,
   lastWeightForExercise,
+  nextAlternatingSide,
   logsForItem,
   nextSetNumber,
   nextWorkItem,
@@ -84,14 +85,44 @@ describe("getWorkoutStep", () => {
     });
   });
 
-  it("advances to the right side after left sets are done", () => {
-    const logs: Pick<SetLog, "programmeExerciseId" | "side">[] = [
-      { programmeExerciseId: "e1", side: "left" },
-      { programmeExerciseId: "e1", side: "left" },
-    ];
-    const step = getWorkoutStep([warmup, squat], logs, [
-      { programmeExerciseId: "w1" },
-    ]);
+  it("alternates to the right after one left set", () => {
+    const step = getWorkoutStep(
+      [warmup, squat],
+      [{ programmeExerciseId: "e1", side: "left" }],
+      [{ programmeExerciseId: "w1" }],
+    );
+    expect(step).toMatchObject({
+      kind: "work",
+      side: "right",
+      setNumber: 1,
+    });
+  });
+
+  it("returns to the left after a left/right pair", () => {
+    const step = getWorkoutStep(
+      [warmup, squat],
+      [
+        { programmeExerciseId: "e1", side: "left" },
+        { programmeExerciseId: "e1", side: "right" },
+      ],
+      [{ programmeExerciseId: "w1" }],
+    );
+    expect(step).toMatchObject({
+      kind: "work",
+      side: "left",
+      setNumber: 2,
+    });
+  });
+
+  it("catches up the lagging side if one side was logged twice", () => {
+    const step = getWorkoutStep(
+      [warmup, squat],
+      [
+        { programmeExerciseId: "e1", side: "left" },
+        { programmeExerciseId: "e1", side: "left" },
+      ],
+      [{ programmeExerciseId: "w1" }],
+    );
     expect(step).toMatchObject({
       kind: "work",
       side: "right",
@@ -185,6 +216,19 @@ describe("session logging helpers", () => {
         "left",
       ),
     ).toBe(4);
+  });
+
+  it("picks the next side after a set is logged", () => {
+    expect(nextAlternatingSide(squat, [])).toBe("left");
+    expect(nextAlternatingSide(squat, [], "left")).toBe("right");
+    expect(
+      nextAlternatingSide(
+        squat,
+        [{ programmeExerciseId: "e1", side: "left" }],
+        "right",
+      ),
+    ).toBe("left");
+    expect(nextAlternatingSide(curl, [])).toBe("none");
   });
 
   it("moves to the next working lift, then stops", () => {

@@ -16,9 +16,11 @@ import {
   formatKg,
   getWorkoutStep,
   isExerciseComplete,
+  formatLoggedSet,
   lastRepsForExercise,
   lastWeightForExercise,
   logsForItem,
+  nextAlternatingSide,
   nextSetNumber,
   nextWorkItem,
   setsLoggedFor,
@@ -109,16 +111,21 @@ export function WorkoutClient({
         onFinish={() => run(() => finishSessionAction(sessionId))}
         onBack={
           workItems[0]
-            ? () =>
+            ? () => {
+                const last = workItems[workItems.length - 1];
                 setFocus({
-                  itemId: workItems[workItems.length - 1].id,
-                  side: sidesFor(workItems[workItems.length - 1])[0],
-                })
+                  itemId: last.id,
+                  side: nextAlternatingSide(last, logs),
+                });
+              }
             : undefined
         }
         workItems={workItems}
         onJump={(item) =>
-          setFocus({ itemId: item.id, side: sidesFor(item)[0] })
+          setFocus({
+            itemId: item.id,
+            side: nextAlternatingSide(item, logs),
+          })
         }
       />
     );
@@ -135,11 +142,17 @@ export function WorkoutClient({
         history={history}
         pending={pending}
         onSelectExercise={(item) =>
-          setFocus({ itemId: item.id, side: sidesFor(item)[0] })
+          setFocus({
+            itemId: item.id,
+            side: nextAlternatingSide(item, logs),
+          })
         }
         onSelectSide={(side) => setFocus({ itemId: focusedItem.id, side })}
         onLog={(reps, weightKg) => {
-          setFocus({ itemId: focusedItem.id, side: focusedSide });
+          setFocus({
+            itemId: focusedItem.id,
+            side: nextAlternatingSide(focusedItem, logs, focusedSide),
+          });
           run(() =>
             logSetAction({
               sessionId,
@@ -159,7 +172,10 @@ export function WorkoutClient({
         onNext={() => {
           const next = nextWorkItem(items, focusedItem.id);
           if (next) {
-            setFocus({ itemId: next.id, side: sidesFor(next)[0] });
+            setFocus({
+              itemId: next.id,
+              side: nextAlternatingSide(next, logs),
+            });
             return;
           }
           setFocus(null);
@@ -303,12 +319,16 @@ function WorkCard({
 
   const targetSets = targetSetsFor(item);
   const logged = logsForItem(logs, item.id, side);
+  const allLogged = logsForItem(logs, item.id);
   const extras = Math.max(0, logged.length - targetSets);
   const nextLabel = nextWorkItem(workItems, item.id)
     ? "Next exercise"
     : "Review session";
+  const bilateral = sidesFor(item).length > 1;
+  const sideLabel =
+    side === "left" ? "left" : side === "right" ? "right" : null;
   const prescription = [
-    `${targetSets} sets`,
+    bilateral ? `${targetSets} sets each side, alternating` : `${targetSets} sets`,
     item.targetReps ? `${item.targetReps} reps` : null,
     item.targetWeightKg ? `${formatKg(item.targetWeightKg)} kg` : null,
   ]
@@ -331,7 +351,7 @@ function WorkCard({
         <h2 className="mt-2 font-display text-3xl text-ink">{item.name}</h2>
         {item.cues ? <p className="mt-3 text-sm leading-6 text-ink">{item.cues}</p> : null}
         {item.notes ? <p className="mt-2 text-sm text-muted">{item.notes}</p> : null}
-        {sidesFor(item).length > 1 ? (
+        {bilateral ? (
           <div className="mt-4 grid grid-cols-2 gap-2">
             {sidesFor(item).map((entry) => {
               const done = setsLoggedFor(logs, item.id, entry);
@@ -361,7 +381,8 @@ function WorkCard({
       </div>
 
       <LoggedSets
-        logs={logged}
+        logs={allLogged}
+        showSide={bilateral}
         pending={pending}
         onDelete={onDeleteSet}
       />
@@ -389,7 +410,7 @@ function WorkCard({
         onClick={() => onLog(reps, weight)}
         className="w-full rounded-3xl bg-accent px-4 py-5 text-lg font-medium text-accent-ink"
       >
-        Log set {logged.length + 1}
+        Log {sideLabel ? `${sideLabel} ` : ""}set {logged.length + 1}
         {logged.length >= targetSets ? " (extra)" : ""}
       </button>
 
@@ -450,10 +471,12 @@ function ExerciseChips({
 
 function LoggedSets({
   logs,
+  showSide,
   pending,
   onDelete,
 }: {
   logs: SetLog[];
+  showSide: boolean;
   pending: boolean;
   onDelete: (setLogId: string) => void;
 }) {
@@ -474,7 +497,10 @@ function LoggedSets({
         {logs.map((log, index) => (
           <li key={log.id} className="flex items-center justify-between gap-3 py-2">
             <p className="font-mono text-base text-ink">
-              {index + 1}. {formatKg(log.weightKg)} kg × {log.reps}
+              {index + 1}.{" "}
+              {showSide
+                ? formatLoggedSet(log)
+                : `${formatKg(log.weightKg)} kg × ${log.reps}`}
             </p>
             <button
               type="button"

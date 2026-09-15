@@ -89,7 +89,7 @@ export function ProgrammeEditor({
                   className="rounded-xl border border-line bg-paper px-2 py-1"
                 >
                   <option value="none">Single</option>
-                  <option value="bilateral">Both sides</option>
+                  <option value="bilateral">Both sides, alternating</option>
                 </select>
               </label>
             </div>
@@ -174,7 +174,7 @@ export function ProgrammeEditor({
               className="rounded-xl border border-line bg-card px-2 py-1"
             >
               <option value="none">Single</option>
-              <option value="bilateral">Both sides</option>
+              <option value="bilateral">Both sides, alternating</option>
             </select>
           </div>
           <button
