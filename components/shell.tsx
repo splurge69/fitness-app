@@ -5,7 +5,7 @@ const links = [
   { href: "/", label: "Today" },
   { href: "/history", label: "History" },
   { href: "/programme", label: "Programme" },
-];
+] as const;
 
 export function Shell({
   children,
