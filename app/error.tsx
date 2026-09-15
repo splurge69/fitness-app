@@ -1,11 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 export default function ErrorPage({
   error,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
+
   return (
     <main className="mx-auto flex min-h-full w-full max-w-lg flex-col justify-center px-4 py-16">
       <h1 className="font-display text-3xl text-ink">Something broke</h1>
@@ -19,7 +23,7 @@ export default function ErrorPage({
       ) : null}
       <button
         type="button"
-        onClick={() => window.location.assign("/login")}
+        onClick={() => router.push("/login")}
         className="mt-6 rounded-2xl bg-ink px-4 py-3 text-sm font-medium text-paper"
       >
         Reload login
