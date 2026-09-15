@@ -308,6 +308,19 @@ export async function getRecentSetLogs(limit = 200): Promise<SetLog[]> {
   return ((data ?? []) as SetLogRow[]).map(mapSetLog);
 }
 
+export async function deleteSetLog(
+  sessionId: string,
+  setLogId: string,
+): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("set_logs")
+    .delete()
+    .eq("id", setLogId)
+    .eq("session_id", sessionId);
+
+  throwIfError(error);
+}
+
 export async function insertSetLog(input: {
   sessionId: string;
   exerciseId: string;

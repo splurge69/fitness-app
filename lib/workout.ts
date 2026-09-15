@@ -107,3 +107,74 @@ export function lastRepsForExercise(
   return any?.reps ?? null;
 }
 
+export function logsForItem(
+  logs: SetLog[],
+  itemId: string,
+  side?: Side,
+): SetLog[] {
+  return logs.filter((log) => {
+    if (log.programmeExerciseId !== itemId) return false;
+    return side === undefined || log.side === side;
+  });
+}
+
+export function nextSetNumber(
+  logs: Pick<SetLog, "programmeExerciseId" | "side" | "setNumber">[],
+  itemId: string,
+  side: Side,
+): number {
+  const matching = logs.filter(
+    (log) => log.programmeExerciseId === itemId && log.side === side,
+  );
+  if (matching.length === 0) return 1;
+  return Math.max(...matching.map((log) => log.setNumber)) + 1;
+}
+
+export function nextWorkItem(
+  items: ProgrammeExercise[],
+  currentId: string,
+): ProgrammeExercise | null {
+  const work = [...items]
+    .filter((item) => !item.isWarmup)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const index = work.findIndex((item) => item.id === currentId);
+  if (index < 0) return work[0] ?? null;
+  return work[index + 1] ?? null;
+}
+
+export function formatKg(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+export function formatLoggedSet(log: Pick<SetLog, "side" | "weightKg" | "reps">): string {
+  const side =
+    log.side === "left" ? "L " : log.side === "right" ? "R " : "";
+  return `${side}${formatKg(log.weightKg)} kg × ${log.reps}`;
+}
+
+export function groupLogsByName(
+  logs: SetLog[],
+): Array<{ name: string; sets: SetLog[] }> {
+  const groups: Array<{ name: string; sets: SetLog[] }> = [];
+  const indexByName = new Map<string, number>();
+
+  for (const log of logs) {
+    const existing = indexByName.get(log.exerciseNameSnapshot);
+    if (existing === undefined) {
+      indexByName.set(log.exerciseNameSnapshot, groups.length);
+      groups.push({ name: log.exerciseNameSnapshot, sets: [log] });
+      continue;
+    }
+    groups[existing].sets.push(log);
+  }
+
+  return groups;
+}
+
+export function summariseLogs(logs: SetLog[]): string[] {
+  return groupLogsByName(logs).map(({ name, sets }) => {
+    return `${name}: ${sets.map(formatLoggedSet).join(", ")}`;
+  });
+}
+

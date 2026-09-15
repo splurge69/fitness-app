@@ -6,6 +6,7 @@ import {
   completeSession,
   createSession,
   deleteSession,
+  deleteSetLog,
   getActiveProgramme,
   getOpenSession,
   insertSetLog,
@@ -41,6 +42,14 @@ export async function logSetAction(input: {
 }): Promise<void> {
   await requireSession();
   await insertSetLog(input);
+}
+
+export async function deleteSetAction(
+  sessionId: string,
+  setLogId: string,
+): Promise<void> {
+  await requireSession();
+  await deleteSetLog(sessionId, setLogId);
 }
 
 export async function checkWarmupAction(
