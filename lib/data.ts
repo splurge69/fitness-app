@@ -235,6 +235,26 @@ export async function createSession(programmeId: string): Promise<Session> {
   return mapSession(data as SessionRow);
 }
 
+export async function deleteSession(sessionId: string): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("sessions")
+    .delete()
+    .eq("id", sessionId);
+
+  throwIfError(error);
+}
+
+export async function getAllSessions(): Promise<Session[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("sessions")
+    .select("id, programme_id, started_at, completed_at, notes")
+    .order("started_at", { ascending: false })
+    .limit(40);
+
+  throwIfError(error);
+  return ((data ?? []) as SessionRow[]).map(mapSession);
+}
+
 export async function completeSession(sessionId: string): Promise<void> {
   const { error } = await supabaseAdmin()
     .from("sessions")

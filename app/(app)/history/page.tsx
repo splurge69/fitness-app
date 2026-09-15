@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { DeleteSessionButton } from "@/components/delete-session-button";
 import { Shell } from "@/components/shell";
-import { getCompletedSessions, getSessionLogs } from "@/lib/data";
+import { getAllSessions, getSessionLogs } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { describeSupabaseError } from "@/lib/supabase-error";
 
@@ -15,7 +16,7 @@ export default async function HistoryPage() {
 
   let sessions;
   try {
-    sessions = await getCompletedSessions();
+    sessions = await getAllSessions();
   } catch (error) {
     return (
       <Shell title="History">
@@ -42,6 +43,7 @@ export default async function HistoryPage() {
               className="rounded-3xl border border-line bg-card p-5"
             >
               <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                {session.completedAt ? "Completed" : "In progress"} ·{" "}
                 {new Date(session.completedAt ?? session.startedAt).toLocaleString(
                   undefined,
                   { weekday: "short", day: "numeric", month: "short" },
@@ -56,12 +58,15 @@ export default async function HistoryPage() {
                   <li key={line}>{line}</li>
                 ))}
               </ul>
-              <Link
-                href={`/workout/${session.id}`}
-                className="mt-4 inline-block text-sm text-ink underline decoration-line underline-offset-4"
-              >
-                Open session
-              </Link>
+              <div className="mt-4 flex items-center gap-4">
+                <Link
+                  href={`/workout/${session.id}`}
+                  className="text-sm text-ink underline decoration-line underline-offset-4"
+                >
+                  Open session
+                </Link>
+                <DeleteSessionButton sessionId={session.id} />
+              </div>
             </li>
           ))}
         </ol>

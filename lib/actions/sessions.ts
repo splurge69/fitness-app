@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/session";
 import {
   completeSession,
   createSession,
+  deleteSession,
   getActiveProgramme,
   getOpenSession,
   insertSetLog,
@@ -54,4 +55,10 @@ export async function finishSessionAction(sessionId: string): Promise<void> {
   await requireSession();
   await completeSession(sessionId);
   redirect("/");
+}
+
+export async function deleteSessionAction(sessionId: string): Promise<void> {
+  await requireSession();
+  await deleteSession(sessionId);
+  redirect("/history");
 }

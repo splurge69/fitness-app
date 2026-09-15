@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { NumberStepper } from "@/components/stepper";
+import { DeleteSessionButton } from "@/components/delete-session-button";
 import {
   checkWarmupAction,
   finishSessionAction,
@@ -61,6 +62,9 @@ export function WorkoutClient({
             Mark session complete
           </button>
         ) : null}
+        <div className="mt-4">
+          <DeleteSessionButton sessionId={sessionId} />
+        </div>
       </section>
     );
   }
@@ -79,6 +83,7 @@ export function WorkoutClient({
           }
         />
         <EndSessionButton sessionId={sessionId} pending={pending} />
+        <DeleteSessionButton sessionId={sessionId} label="Delete this session" />
       </div>
     );
   }
@@ -110,6 +115,7 @@ export function WorkoutClient({
         }
       />
       <EndSessionButton sessionId={sessionId} pending={pending} />
+      <DeleteSessionButton sessionId={sessionId} label="Delete this session" />
     </div>
   );
 }
