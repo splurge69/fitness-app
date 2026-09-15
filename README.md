@@ -26,10 +26,12 @@ Next.js App Router on Vercel. Supabase Postgres for data. All database access is
 APP_PASSWORD=choose-a-password
 SESSION_SECRET=at-least-16-random-characters
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-secret
 ```
 
-`SESSION_SECRET` can be generated with `openssl rand -base64 32`. The service role key stays on the server. Do not prefix it with `NEXT_PUBLIC_`.
+`SESSION_SECRET` can be generated with `openssl rand -base64 32`.
+
+`SUPABASE_SERVICE_ROLE_KEY` must be the **secret / service_role** key from Supabase → Project Settings → API. The publishable/anon key cannot read these tables (RLS is on and `anon` has no grants). Do not prefix it with `NEXT_PUBLIC_`.
 
 5. Deploy, open the URL, log in, start a session.
 

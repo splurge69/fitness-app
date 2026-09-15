@@ -1,6 +1,7 @@
 import { Shell } from "@/components/shell";
 import { getActiveProgramme, getProgrammeItems } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { describeSupabaseError } from "@/lib/supabase-error";
 import { ProgrammeEditor } from "./programme-editor";
 
 export default async function ProgrammePage() {
@@ -12,7 +13,16 @@ export default async function ProgrammePage() {
     );
   }
 
-  const programme = await getActiveProgramme();
+  let programme;
+  try {
+    programme = await getActiveProgramme();
+  } catch (error) {
+    return (
+      <Shell title="Programme">
+        <p className="text-muted">{describeSupabaseError(error)}</p>
+      </Shell>
+    );
+  }
   if (!programme) {
     return (
       <Shell title="Programme">

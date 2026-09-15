@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { getCompletedSessions, getSessionLogs } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { describeSupabaseError } from "@/lib/supabase-error";
 
 export default async function HistoryPage() {
   if (!isSupabaseConfigured()) {
@@ -12,7 +13,16 @@ export default async function HistoryPage() {
     );
   }
 
-  const sessions = await getCompletedSessions();
+  let sessions;
+  try {
+    sessions = await getCompletedSessions();
+  } catch (error) {
+    return (
+      <Shell title="History">
+        <p className="text-muted">{describeSupabaseError(error)}</p>
+      </Shell>
+    );
+  }
   const recent = await Promise.all(
     sessions.slice(0, 8).map(async (session) => ({
       session,

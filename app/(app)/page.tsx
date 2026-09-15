@@ -9,6 +9,7 @@ import {
 } from "@/lib/data";
 import { formatHoursSince, getFrequencyStatus } from "@/lib/frequency";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { describeSupabaseError } from "@/lib/supabase-error";
 
 export default async function HomePage() {
   if (!isSupabaseConfigured()) {
@@ -19,13 +20,25 @@ export default async function HomePage() {
     );
   }
 
-  const [programme, openSession, lastSession, sessionsThisWeek] =
-    await Promise.all([
+  let programme;
+  let openSession;
+  let lastSession;
+  let sessionsThisWeek;
+
+  try {
+    [programme, openSession, lastSession, sessionsThisWeek] = await Promise.all([
       getActiveProgramme(),
       getOpenSession(),
       getLastCompletedSession(),
       countSessionsThisWeek(),
     ]);
+  } catch (error) {
+    return (
+      <Shell>
+        <SetupCard detail={describeSupabaseError(error)} />
+      </Shell>
+    );
+  }
 
   const items = programme ? await getProgrammeItems(programme.id) : [];
   const working = items.filter((item) => !item.isWarmup);
@@ -128,16 +141,22 @@ export default async function HomePage() {
   );
 }
 
-function SetupCard() {
+function SetupCard({ detail }: { detail?: string }) {
   return (
     <section className="rounded-3xl border border-line bg-card p-5">
       <h2 className="font-display text-2xl text-ink">Connect Supabase</h2>
       <p className="mt-3 text-sm leading-6 text-muted">
-        The login gate is working. Add{" "}
-        <code className="font-mono text-ink">SUPABASE_URL</code> and{" "}
-        <code className="font-mono text-ink">SUPABASE_SERVICE_ROLE_KEY</code>,
-        then paste <code className="font-mono text-ink">supabase/setup.sql</code>{" "}
-        into the Supabase SQL editor.
+        {detail ?? (
+          <>
+            The login gate is working. Add{" "}
+            <code className="font-mono text-ink">SUPABASE_URL</code> and the{" "}
+            <code className="font-mono text-ink">service_role</code> secret as{" "}
+            <code className="font-mono text-ink">SUPABASE_SERVICE_ROLE_KEY</code>
+            , then paste{" "}
+            <code className="font-mono text-ink">supabase/setup.sql</code> into
+            the Supabase SQL editor. Do not use the publishable/anon key.
+          </>
+        )}
       </p>
     </section>
   );
