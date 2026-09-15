@@ -9,6 +9,7 @@ import {
   getProgrammeItems,
 } from "@/lib/data";
 import { formatHoursSince, getFrequencyStatus } from "@/lib/frequency";
+import { muscleFor } from "@/lib/muscles";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { describeSupabaseError } from "@/lib/supabase-error";
 
@@ -122,9 +123,7 @@ export default async function HomePage() {
                   <p className="text-xs uppercase tracking-[0.14em] text-muted">
                     {item.isWarmup
                       ? "Warm-up"
-                      : item.laterality === "bilateral"
-                        ? "ACL left · alternating"
-                        : "Single movement"}
+                      : muscleFor(item.name, item.exerciseId) ?? "Work"}
                   </p>
                   <p className="mt-1 text-lg text-ink">{item.name}</p>
                   <p className="mt-1 text-sm text-muted">

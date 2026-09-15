@@ -1,4 +1,5 @@
 import { ExerciseArt } from "@/components/exercise-art";
+import { muscleFor } from "@/lib/muscles";
 import {
   addProgrammeItemAction,
   moveProgrammeItemAction,
@@ -16,7 +17,9 @@ export function ProgrammeEditor({
 }) {
   return (
     <div className="space-y-6">
-      {items.map((item, index) => (
+      {items.map((item, index) => {
+        const muscle = muscleFor(item.name, item.exerciseId);
+        return (
         <article
           key={item.id}
           className="rounded-3xl border border-line bg-card p-4"
@@ -27,7 +30,14 @@ export function ProgrammeEditor({
               exerciseId={item.exerciseId}
               size="md"
             />
-            <p className="font-display text-xl text-ink">{item.name}</p>
+            <div>
+              {muscle || item.isWarmup ? (
+                <p className="text-xs uppercase tracking-[0.14em] text-muted">
+                  {muscle ?? "Warm-up"}
+                </p>
+              ) : null}
+              <p className="font-display text-xl text-ink">{item.name}</p>
+            </div>
           </div>
           <form action={saveProgrammeItemAction} className="space-y-3">
             <input type="hidden" name="id" value={item.id} />
@@ -143,7 +153,8 @@ export function ProgrammeEditor({
             </form>
           </div>
         </article>
-      ))}
+        );
+      })}
 
       <article className="rounded-3xl border border-dashed border-line p-4">
         <h2 className="font-display text-2xl text-ink">Add exercise</h2>

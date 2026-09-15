@@ -14,6 +14,7 @@ import {
 } from "@/lib/actions/sessions";
 import type { ProgrammeExercise, SetLog, Side, WarmupCheck } from "@/lib/types";
 import { formatSide } from "@/lib/rehab";
+import { muscleFor } from "@/lib/muscles";
 import {
   formatKg,
   getWorkoutStep,
@@ -342,7 +343,9 @@ function WorkCard({
   );
   const bilateral = sidesFor(item).length > 1;
   const sideLabel = side === "none" ? null : side;
+  const muscle = muscleFor(item.name, item.exerciseId);
   const prescription = [
+    muscle,
     bilateral ? `${targetSets} sets each side, alternating` : `${targetSets} sets`,
     item.targetReps ? `${item.targetReps} reps` : null,
     item.targetWeightKg ? `${formatKg(item.targetWeightKg)} kg` : null,
