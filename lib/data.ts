@@ -71,17 +71,20 @@ function mapProgramme(row: ProgrammeRow): Programme {
   };
 }
 
-function mapExercise(value: ExerciseRow | ExerciseRow[] | null): ExerciseRow {
-  if (Array.isArray(value)) {
-    if (!value[0]) throw new Error("Programme item is missing its exercise");
-    return value[0];
-  }
-  if (!value) throw new Error("Programme item is missing its exercise");
-  return value;
+function throwIfError(error: { message?: string; code?: string; hint?: string } | null) {
+  if (!error) return;
+  const err = new Error(
+    [error.message, error.hint].filter(Boolean).join(" — ") ||
+      "Supabase query failed",
+  );
+  Object.assign(err, { code: error.code, hint: error.hint });
+  throw err;
 }
 
-function mapProgrammeExercise(row: ProgrammeExerciseRow): ProgrammeExercise {
-  const exercise = mapExercise(row.exercises);
+function mapProgrammeExercise(
+  row: Omit<ProgrammeExerciseRow, "exercises">,
+  exercise: ExerciseRow,
+): ProgrammeExercise {
   return {
     id: row.id,
     programmeId: row.programme_id,
@@ -133,7 +136,7 @@ export async function getActiveProgramme(): Promise<Programme | null> {
     .eq("is_active", true)
     .maybeSingle();
 
-  if (error) throw error;
+  throwIfError(error);
   return data ? mapProgramme(data as ProgrammeRow) : null;
 }
 
@@ -143,13 +146,33 @@ export async function getProgrammeItems(
   const { data, error } = await supabaseAdmin()
     .from("programme_exercises")
     .select(
-      "id, programme_id, exercise_id, sort_order, is_warmup, target_sets, target_reps, target_weight_kg, notes, exercises(id, name, cues, laterality)",
+      "id, programme_id, exercise_id, sort_order, is_warmup, target_sets, target_reps, target_weight_kg, notes",
     )
     .eq("programme_id", programmeId)
     .order("sort_order", { ascending: true });
 
-  if (error) throw error;
-  return ((data ?? []) as ProgrammeExerciseRow[]).map(mapProgrammeExercise);
+  throwIfError(error);
+  const rows = (data ?? []) as Omit<ProgrammeExerciseRow, "exercises">[];
+  if (rows.length === 0) return [];
+
+  const exerciseIds = [...new Set(rows.map((row) => row.exercise_id))];
+  const { data: exercises, error: exerciseError } = await supabaseAdmin()
+    .from("exercises")
+    .select("id, name, cues, laterality")
+    .in("id", exerciseIds);
+
+  throwIfError(exerciseError);
+  const byId = new Map(
+    ((exercises ?? []) as ExerciseRow[]).map((exercise) => [exercise.id, exercise]),
+  );
+
+  return rows.map((row) => {
+    const exercise = byId.get(row.exercise_id);
+    if (!exercise) {
+      throw new Error(`Exercise ${row.exercise_id} is missing from the catalogue.`);
+    }
+    return mapProgrammeExercise(row, exercise);
+  });
 }
 
 export async function getOpenSession(): Promise<Session | null> {
@@ -161,7 +184,7 @@ export async function getOpenSession(): Promise<Session | null> {
     .limit(1)
     .maybeSingle();
 
-  if (error) throw error;
+  throwIfError(error);
   return data ? mapSession(data as SessionRow) : null;
 }
 
@@ -172,7 +195,7 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     .eq("id", sessionId)
     .maybeSingle();
 
-  if (error) throw error;
+  throwIfError(error);
   return data ? mapSession(data as SessionRow) : null;
 }
 
@@ -185,7 +208,7 @@ export async function getLastCompletedSession(): Promise<Session | null> {
     .limit(1)
     .maybeSingle();
 
-  if (error) throw error;
+  throwIfError(error);
   return data ? mapSession(data as SessionRow) : null;
 }
 
@@ -197,7 +220,7 @@ export async function countSessionsThisWeek(now = new Date()): Promise<number> {
     .not("completed_at", "is", null)
     .gte("completed_at", weekStart);
 
-  if (error) throw error;
+  throwIfError(error);
   return count ?? 0;
 }
 
@@ -208,7 +231,7 @@ export async function createSession(programmeId: string): Promise<Session> {
     .select("id, programme_id, started_at, completed_at, notes")
     .single();
 
-  if (error) throw error;
+  throwIfError(error);
   return mapSession(data as SessionRow);
 }
 
@@ -218,7 +241,7 @@ export async function completeSession(sessionId: string): Promise<void> {
     .update({ completed_at: new Date().toISOString() })
     .eq("id", sessionId);
 
-  if (error) throw error;
+  throwIfError(error);
 }
 
 export async function getSessionLogs(sessionId: string): Promise<SetLog[]> {
@@ -230,7 +253,7 @@ export async function getSessionLogs(sessionId: string): Promise<SetLog[]> {
     .eq("session_id", sessionId)
     .order("completed_at", { ascending: true });
 
-  if (error) throw error;
+  throwIfError(error);
   return ((data ?? []) as SetLogRow[]).map(mapSetLog);
 }
 
@@ -240,7 +263,7 @@ export async function getWarmupChecks(sessionId: string): Promise<WarmupCheck[]>
     .select("session_id, programme_exercise_id, completed_at")
     .eq("session_id", sessionId);
 
-  if (error) throw error;
+  throwIfError(error);
   return ((data ?? []) as Array<{
     session_id: string;
     programme_exercise_id: string;
@@ -261,7 +284,7 @@ export async function getRecentSetLogs(limit = 200): Promise<SetLog[]> {
     .order("completed_at", { ascending: false })
     .limit(limit);
 
-  if (error) throw error;
+  throwIfError(error);
   return ((data ?? []) as SetLogRow[]).map(mapSetLog);
 }
 
@@ -292,7 +315,7 @@ export async function insertSetLog(input: {
     )
     .single();
 
-  if (error) throw error;
+  throwIfError(error);
   return mapSetLog(data as SetLogRow);
 }
 
@@ -305,7 +328,7 @@ export async function insertWarmupCheck(
     programme_exercise_id: programmeExerciseId,
   });
 
-  if (error) throw error;
+  throwIfError(error);
 }
 
 export async function getCompletedSessions(): Promise<
@@ -318,7 +341,7 @@ export async function getCompletedSessions(): Promise<
     .order("completed_at", { ascending: false })
     .limit(40);
 
-  if (error) throw error;
+  throwIfError(error);
   const sessions = ((data ?? []) as SessionRow[]).map(mapSession);
   const ids = sessions.map((session) => session.id);
   if (ids.length === 0) return [];
@@ -328,7 +351,7 @@ export async function getCompletedSessions(): Promise<
     .select("session_id")
     .in("session_id", ids);
 
-  if (logError) throw logError;
+  throwIfError(logError);
   const counts = new Map<string, number>();
   for (const row of (logs ?? []) as Array<{ session_id: string }>) {
     counts.set(row.session_id, (counts.get(row.session_id) ?? 0) + 1);
@@ -369,7 +392,7 @@ export async function updateProgrammeExercise(input: {
     })
     .eq("id", input.id);
 
-  if (error) throw error;
+  throwIfError(error);
 }
 
 export async function updateExercise(input: {
@@ -388,7 +411,7 @@ export async function updateExercise(input: {
     })
     .eq("id", input.id);
 
-  if (error) throw error;
+  throwIfError(error);
 }
 
 export async function addProgrammeExercise(input: {
@@ -410,7 +433,7 @@ export async function addProgrammeExercise(input: {
     .limit(1)
     .maybeSingle();
 
-  if (lastError) throw lastError;
+  throwIfError(lastError);
   const nextOrder = ((last as { sort_order: number } | null)?.sort_order ?? 0) + 10;
 
   const { data: exercise, error: exerciseError } = await supabaseAdmin()
@@ -423,7 +446,7 @@ export async function addProgrammeExercise(input: {
     .select("id")
     .single();
 
-  if (exerciseError) throw exerciseError;
+  throwIfError(exerciseError);
 
   const { error } = await supabaseAdmin().from("programme_exercises").insert({
     programme_id: input.programmeId,
@@ -436,7 +459,7 @@ export async function addProgrammeExercise(input: {
     notes: input.notes,
   });
 
-  if (error) throw error;
+  throwIfError(error);
 }
 
 export async function removeProgrammeExercise(id: string): Promise<void> {
@@ -445,7 +468,7 @@ export async function removeProgrammeExercise(id: string): Promise<void> {
     .delete()
     .eq("id", id);
 
-  if (error) throw error;
+  throwIfError(error);
 }
 
 export async function moveProgrammeExercise(
@@ -458,7 +481,7 @@ export async function moveProgrammeExercise(
     .eq("id", id)
     .single();
 
-  if (currentError) throw currentError;
+  throwIfError(currentError);
   const row = current as { id: string; programme_id: string; sort_order: number };
 
   const { data: siblings, error: siblingError } = await supabaseAdmin()
@@ -467,7 +490,7 @@ export async function moveProgrammeExercise(
     .eq("programme_id", row.programme_id)
     .order("sort_order", { ascending: true });
 
-  if (siblingError) throw siblingError;
+  throwIfError(siblingError);
   const list = (siblings ?? []) as Array<{ id: string; sort_order: number }>;
   const index = list.findIndex((item) => item.id === id);
   const swapWith = direction === "up" ? list[index - 1] : list[index + 1];
@@ -478,17 +501,17 @@ export async function moveProgrammeExercise(
     .from("programme_exercises")
     .update({ sort_order: parkingOrder })
     .eq("id", row.id);
-  if (parkError) throw parkError;
+  throwIfError(parkError);
 
   const { error: firstError } = await supabaseAdmin()
     .from("programme_exercises")
     .update({ sort_order: row.sort_order })
     .eq("id", swapWith.id);
-  if (firstError) throw firstError;
+  throwIfError(firstError);
 
   const { error: secondError } = await supabaseAdmin()
     .from("programme_exercises")
     .update({ sort_order: swapWith.sort_order })
     .eq("id", row.id);
-  if (secondError) throw secondError;
+  throwIfError(secondError);
 }

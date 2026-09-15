@@ -1,0 +1,28 @@
+"use client";
+
+export default function ErrorPage({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  return (
+    <main className="mx-auto flex min-h-full w-full max-w-lg flex-col justify-center px-4 py-16">
+      <h1 className="font-display text-3xl text-ink">Something broke</h1>
+      <p className="mt-3 text-sm leading-6 text-muted">
+        {error.message || "A server error occurred."}
+      </p>
+      {error.digest ? (
+        <p className="mt-2 font-mono text-xs text-muted">Digest {error.digest}</p>
+      ) : null}
+      <button
+        type="button"
+        onClick={reset}
+        className="mt-6 rounded-2xl bg-ink px-4 py-3 text-sm font-medium text-paper"
+      >
+        Try again
+      </button>
+    </main>
+  );
+}

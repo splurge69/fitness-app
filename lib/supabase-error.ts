@@ -13,6 +13,9 @@ export function describeSupabaseError(error: unknown): string {
   if (isMissingPrivilegeError(error)) {
     return "The database key on Vercel is a publishable/anon key. Replace SUPABASE_SERVICE_ROLE_KEY with the secret service_role key from Supabase → Project Settings → API.";
   }
-  if (error instanceof Error) return error.message;
-  return "Could not load data from Supabase.";
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("does not exist") || message.includes("schema cache")) {
+    return "The tables are missing. Paste supabase/setup.sql into the Supabase SQL editor, then refresh.";
+  }
+  return message || "Could not load data from Supabase.";
 }

@@ -24,6 +24,7 @@ export default async function HomePage() {
   let openSession;
   let lastSession;
   let sessionsThisWeek;
+  let items = [];
 
   try {
     [programme, openSession, lastSession, sessionsThisWeek] = await Promise.all([
@@ -32,15 +33,15 @@ export default async function HomePage() {
       getLastCompletedSession(),
       countSessionsThisWeek(),
     ]);
+    items = programme ? await getProgrammeItems(programme.id) : [];
   } catch (error) {
+    console.error("Home data failed", error);
     return (
       <Shell>
         <SetupCard detail={describeSupabaseError(error)} />
       </Shell>
     );
   }
-
-  const items = programme ? await getProgrammeItems(programme.id) : [];
   const working = items.filter((item) => !item.isWarmup);
   const frequency = getFrequencyStatus({
     lastCompletedAt: lastSession?.completedAt

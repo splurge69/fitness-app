@@ -27,4 +27,10 @@ describe("describeSupabaseError", () => {
       }),
     ).toMatch(/service_role/);
   });
+
+  it("tells you to run setup SQL when tables are missing", () => {
+    expect(
+      describeSupabaseError(new Error('relation "programmes" does not exist')),
+    ).toMatch(/setup\.sql/);
+  });
 });

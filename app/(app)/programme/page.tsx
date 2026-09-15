@@ -14,8 +14,10 @@ export default async function ProgrammePage() {
   }
 
   let programme;
+  let items;
   try {
     programme = await getActiveProgramme();
+    items = programme ? await getProgrammeItems(programme.id) : [];
   } catch (error) {
     return (
       <Shell title="Programme">
@@ -32,8 +34,6 @@ export default async function ProgrammePage() {
       </Shell>
     );
   }
-
-  const items = await getProgrammeItems(programme.id);
 
   return (
     <Shell title="Programme">
