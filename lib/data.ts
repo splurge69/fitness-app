@@ -249,7 +249,7 @@ export async function getAllSessions(): Promise<Session[]> {
     .from("sessions")
     .select("id, programme_id, started_at, completed_at, notes")
     .order("started_at", { ascending: false })
-    .limit(40);
+    .limit(200);
 
   throwIfError(error);
   return ((data ?? []) as SessionRow[]).map(mapSession);
