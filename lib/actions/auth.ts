@@ -18,6 +18,14 @@ export async function loginAction(
     return { error: "That password is not right." };
   }
 
+  const sessionSecret = process.env.SESSION_SECRET?.trim();
+  if (!sessionSecret || sessionSecret.length < 16) {
+    return {
+      error:
+        "SESSION_SECRET is missing in Vercel. Add a long random value (openssl rand -base64 32) for Production, then redeploy.",
+    };
+  }
+
   await createSessionCookie();
   redirect("/");
 }
