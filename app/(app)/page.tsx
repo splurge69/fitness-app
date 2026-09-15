@@ -123,7 +123,7 @@ export default async function HomePage() {
                     {item.isWarmup
                       ? "Warm-up"
                       : item.laterality === "bilateral"
-                        ? "Alternating sides"
+                        ? "ACL left · alternating"
                         : "Single movement"}
                   </p>
                   <p className="mt-1 text-lg text-ink">{item.name}</p>

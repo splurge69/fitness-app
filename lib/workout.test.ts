@@ -5,6 +5,7 @@ import {
   formatLoggedSet,
   getWorkoutStep,
   lastRepsForExercise,
+  lastSessionSetsForExercise,
   lastWeightForExercise,
   nextAlternatingSide,
   logsForItem,
@@ -241,7 +242,7 @@ describe("session logging helpers", () => {
     expect(formatKg(22.5)).toBe("22.5");
     expect(
       formatLoggedSet({ side: "left", weightKg: 22.5, reps: 8 }),
-    ).toBe("L 22.5 kg × 8");
+    ).toBe("L ACL 22.5 kg × 8");
     expect(
       summariseLogs([
         log({
@@ -259,7 +260,48 @@ describe("session logging helpers", () => {
           reps: 6,
         }),
       ]),
-    ).toEqual(["Split squat: L 20 kg × 8, L 22.5 kg × 6"]);
+    ).toEqual(["Split squat: L ACL 20 kg × 8, L ACL 22.5 kg × 6"]);
+  });
+
+  it("returns the previous session's sets for a lift, excluding today", () => {
+    expect(
+      lastSessionSetsForExercise(
+        [
+          log({
+            id: "now",
+            sessionId: "today",
+            exerciseId: "ext",
+            completedAt: "2026-09-15T10:00:00.000Z",
+          }),
+          log({
+            id: "old-2",
+            sessionId: "last",
+            exerciseId: "ext",
+            side: "right",
+            weightKg: 23,
+            reps: 8,
+            completedAt: "2026-09-08T10:05:00.000Z",
+          }),
+          log({
+            id: "old-1",
+            sessionId: "last",
+            exerciseId: "ext",
+            side: "left",
+            weightKg: 20,
+            reps: 8,
+            completedAt: "2026-09-08T10:00:00.000Z",
+          }),
+          log({
+            id: "older",
+            sessionId: "older",
+            exerciseId: "ext",
+            completedAt: "2026-09-01T10:00:00.000Z",
+          }),
+        ],
+        "ext",
+        "today",
+      ).map((entry) => entry.id),
+    ).toEqual(["old-1", "old-2"]);
   });
 });
 

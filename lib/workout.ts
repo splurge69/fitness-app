@@ -1,4 +1,5 @@
 import type { ProgrammeExercise, SetLog, Side, WarmupCheck } from "./types";
+import { formatSide } from "./rehab";
 
 export const DEFAULT_TARGET_SETS = 3;
 
@@ -158,9 +159,29 @@ export function formatKg(value: number): string {
 }
 
 export function formatLoggedSet(log: Pick<SetLog, "side" | "weightKg" | "reps">): string {
-  const side =
-    log.side === "left" ? "L " : log.side === "right" ? "R " : "";
-  return `${side}${formatKg(log.weightKg)} kg × ${log.reps}`;
+  const side = formatSide(log.side, true);
+  const prefix = side ? `${side} ` : "";
+  return `${prefix}${formatKg(log.weightKg)} kg × ${log.reps}`;
+}
+
+export function lastSessionSetsForExercise(
+  logs: SetLog[],
+  exerciseId: string,
+  currentSessionId: string,
+): SetLog[] {
+  const previous = logs.filter(
+    (log) => log.exerciseId === exerciseId && log.sessionId !== currentSessionId,
+  );
+  if (previous.length === 0) return [];
+
+  const newest = [...previous].sort((a, b) =>
+    b.completedAt.localeCompare(a.completedAt),
+  )[0];
+  if (!newest) return [];
+
+  return previous
+    .filter((log) => log.sessionId === newest.sessionId)
+    .sort((a, b) => a.completedAt.localeCompare(b.completedAt));
 }
 
 export function groupLogsByName(

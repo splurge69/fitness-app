@@ -8,7 +8,8 @@ A personal rehab log for an evolving ACL programme. Use it on the gym floor to s
 - Active programme with warm-ups and working lifts
 - In-session logging: type the kg and reps you actually did, see the live set list, add extra sets, undo a mistype, and alternate left/right on bilateral lifts
 - Matching line plates for each lift, reused on Today, the session screen, History, and the programme editor
-- Last-used weight and reps prefilled for the next session
+- Last-used weight and reps prefilled, with the previous session’s sets shown on each lift card
+- Left is the ACL side; bilateral lifts label it
 - 48-hour gap and twice-weekly frequency on the home screen
 - Programme editor so exercises, targets, and notes can change over time
 

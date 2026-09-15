@@ -13,12 +13,14 @@ import {
   logSetAction,
 } from "@/lib/actions/sessions";
 import type { ProgrammeExercise, SetLog, Side, WarmupCheck } from "@/lib/types";
+import { formatSide } from "@/lib/rehab";
 import {
   formatKg,
   getWorkoutStep,
   isExerciseComplete,
   formatLoggedSet,
   lastRepsForExercise,
+  lastSessionSetsForExercise,
   lastWeightForExercise,
   logsForItem,
   nextAlternatingSide,
@@ -136,6 +138,7 @@ export function WorkoutClient({
     <div className="space-y-4">
       <WorkCard
         key={`${focusedItem.id}-${focusedSide}`}
+        sessionId={sessionId}
         item={focusedItem}
         side={focusedSide}
         workItems={workItems}
@@ -288,6 +291,7 @@ function WarmupCard({
 }
 
 function WorkCard({
+  sessionId,
   item,
   side,
   workItems,
@@ -300,6 +304,7 @@ function WorkCard({
   onDeleteSet,
   onNext,
 }: {
+  sessionId: string;
   item: ProgrammeExercise;
   side: Side;
   workItems: ProgrammeExercise[];
@@ -330,9 +335,13 @@ function WorkCard({
   const nextLabel = nextWorkItem(workItems, item.id)
     ? "Next exercise"
     : "Review session";
+  const lastSession = lastSessionSetsForExercise(
+    history,
+    item.exerciseId,
+    sessionId,
+  );
   const bilateral = sidesFor(item).length > 1;
-  const sideLabel =
-    side === "left" ? "left" : side === "right" ? "right" : null;
+  const sideLabel = side === "none" ? null : side;
   const prescription = [
     bilateral ? `${targetSets} sets each side, alternating` : `${targetSets} sets`,
     item.targetReps ? `${item.targetReps} reps` : null,
@@ -378,7 +387,7 @@ function WorkCard({
                       : "bg-paper text-ink"
                   }`}
                 >
-                  {entry === "left" ? "Left" : "Right"} · {done}/{targetSets}
+                  {formatSide(entry)} · {done}/{targetSets}
                 </button>
               );
             })}
@@ -390,6 +399,8 @@ function WorkCard({
           </p>
         )}
       </div>
+
+      <LastSessionSets logs={lastSession} bilateral={bilateral} />
 
       <LoggedSets
         logs={allLogged}
@@ -481,6 +492,36 @@ function ExerciseChips({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function LastSessionSets({
+  logs,
+  bilateral,
+}: {
+  logs: SetLog[];
+  bilateral: boolean;
+}) {
+  return (
+    <div className="rounded-3xl border border-line bg-card p-4">
+      <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
+        Last session
+      </p>
+      {logs.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">No previous sets for this lift.</p>
+      ) : (
+        <ul className="mt-3 space-y-1 font-mono text-base text-ink">
+          {logs.map((log, index) => (
+            <li key={log.id}>
+              {index + 1}.{" "}
+              {bilateral
+                ? formatLoggedSet(log)
+                : `${formatKg(log.weightKg)} kg × ${log.reps}`}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
