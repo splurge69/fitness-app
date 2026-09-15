@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { ExerciseArt } from "@/components/exercise-art";
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import { SessionLogList } from "@/components/session-log-list";
 import { NumberStepper } from "@/components/stepper";
@@ -263,7 +264,12 @@ function WarmupCard({
 }) {
   return (
     <section className="rounded-3xl border border-line bg-card p-5">
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
+      <ExerciseArt
+        name={item.name}
+        exerciseId={item.exerciseId}
+        size="lg"
+      />
+      <p className="mt-4 text-xs font-medium uppercase tracking-[0.16em] text-muted">
         Warm-up
       </p>
       <h2 className="mt-2 font-display text-3xl text-ink">{item.name}</h2>
@@ -345,7 +351,12 @@ function WorkCard({
       />
 
       <div className="rounded-3xl border border-line bg-card p-5">
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
+        <ExerciseArt
+          name={item.name}
+          exerciseId={item.exerciseId}
+          size="lg"
+        />
+        <p className="mt-4 text-xs font-medium uppercase tracking-[0.16em] text-muted">
           {prescription || "Working set"}
         </p>
         <h2 className="mt-2 font-display text-3xl text-ink">{item.name}</h2>
@@ -450,7 +461,7 @@ function ExerciseChips({
               key={item.id}
               type="button"
               onClick={() => onSelect(item)}
-              className={`shrink-0 rounded-full px-3 py-2 text-sm ${
+              className={`flex shrink-0 items-center gap-2 rounded-full py-1.5 pr-3 pl-1.5 text-sm ${
                 selected
                   ? "bg-ink text-paper"
                   : done
@@ -458,6 +469,11 @@ function ExerciseChips({
                     : "border border-line bg-card text-ink"
               }`}
             >
+              <ExerciseArt
+                name={item.name}
+                exerciseId={item.exerciseId}
+                size="chip"
+              />
               {done ? "✓ " : ""}
               {item.name}
               {count > 0 ? ` · ${count}` : ""}

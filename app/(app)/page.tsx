@@ -1,3 +1,4 @@
+import { ExerciseArt } from "@/components/exercise-art";
 import { Shell } from "@/components/shell";
 import { startWorkoutAction } from "@/lib/actions/sessions";
 import {
@@ -110,25 +111,32 @@ export default async function HomePage() {
             {items.map((item) => (
               <li
                 key={item.id}
-                className="rounded-2xl border border-line bg-card px-4 py-3"
+                className="flex items-center gap-3 rounded-2xl border border-line bg-card px-3 py-3"
               >
-                <p className="text-xs uppercase tracking-[0.14em] text-muted">
-                  {item.isWarmup
-                    ? "Warm-up"
-                    : item.laterality === "bilateral"
-                      ? "Alternating sides"
-                      : "Single movement"}
-                </p>
-                <p className="mt-1 text-lg text-ink">{item.name}</p>
-                <p className="mt-1 text-sm text-muted">
-                  {[
-                    item.targetSets ? `${item.targetSets} sets` : null,
-                    item.targetReps ? `${item.targetReps} reps` : null,
-                    item.targetWeightKg ? `${item.targetWeightKg} kg` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || "No target set"}
-                </p>
+                <ExerciseArt
+                  name={item.name}
+                  exerciseId={item.exerciseId}
+                  size="md"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-[0.14em] text-muted">
+                    {item.isWarmup
+                      ? "Warm-up"
+                      : item.laterality === "bilateral"
+                        ? "Alternating sides"
+                        : "Single movement"}
+                  </p>
+                  <p className="mt-1 text-lg text-ink">{item.name}</p>
+                  <p className="mt-1 text-sm text-muted">
+                    {[
+                      item.targetSets ? `${item.targetSets} sets` : null,
+                      item.targetReps ? `${item.targetReps} reps` : null,
+                      item.targetWeightKg ? `${item.targetWeightKg} kg` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "No target set"}
+                  </p>
+                </div>
               </li>
             ))}
           </ol>

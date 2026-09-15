@@ -1,3 +1,4 @@
+import { ExerciseArt } from "@/components/exercise-art";
 import {
   addProgrammeItemAction,
   moveProgrammeItemAction,
@@ -20,6 +21,14 @@ export function ProgrammeEditor({
           key={item.id}
           className="rounded-3xl border border-line bg-card p-4"
         >
+          <div className="mb-3 flex items-center gap-3">
+            <ExerciseArt
+              name={item.name}
+              exerciseId={item.exerciseId}
+              size="md"
+            />
+            <p className="font-display text-xl text-ink">{item.name}</p>
+          </div>
           <form action={saveProgrammeItemAction} className="space-y-3">
             <input type="hidden" name="id" value={item.id} />
             <input type="hidden" name="exerciseId" value={item.exerciseId} />

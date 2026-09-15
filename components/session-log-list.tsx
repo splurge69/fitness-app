@@ -1,3 +1,4 @@
+import { ExerciseArt } from "@/components/exercise-art";
 import type { SetLog } from "@/lib/types";
 import { formatLoggedSet, groupLogsByName } from "@/lib/workout";
 
@@ -17,7 +18,13 @@ export function SessionLogList({
   return (
     <ol className="space-y-3">
       {groups.map((group) => (
-        <li key={group.name}>
+        <li key={group.name} className="flex gap-3">
+          <ExerciseArt
+            name={group.name}
+            exerciseId={group.sets[0]?.exerciseId}
+            size="sm"
+          />
+          <div className="min-w-0">
           <p className="text-sm font-medium text-ink">{group.name}</p>
           <ul className="mt-1 space-y-1 font-mono text-sm text-muted">
             {group.sets.map((set, index) => (
@@ -26,6 +33,7 @@ export function SessionLogList({
               </li>
             ))}
           </ul>
+          </div>
         </li>
       ))}
     </ol>
