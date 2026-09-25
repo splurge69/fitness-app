@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import {
@@ -59,6 +60,7 @@ export async function saveExerciseLogAction(input: {
     reps: wholeNumber(input.reps, 1),
     sets: wholeNumber(input.sets, 1),
   });
+  revalidatePath(`/workout/${input.sessionId}`);
 }
 
 export async function deleteExerciseLogAction(
@@ -67,6 +69,7 @@ export async function deleteExerciseLogAction(
 ): Promise<void> {
   await requireSession();
   await deleteExerciseLog(sessionId, exerciseId);
+  revalidatePath(`/workout/${sessionId}`);
 }
 
 export async function checkWarmupAction(
@@ -78,6 +81,7 @@ export async function checkWarmupAction(
   const duration =
     durationSeconds === null ? null : wholeNumber(durationSeconds, 0);
   await insertWarmupCheck(sessionId, programmeExerciseId, duration);
+  revalidatePath(`/workout/${sessionId}`);
 }
 
 export async function finishSessionAction(sessionId: string): Promise<void> {

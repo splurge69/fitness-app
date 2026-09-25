@@ -19,15 +19,13 @@ export default async function WorkoutPage({
   const session = await getSession(sessionId);
   if (!session) notFound();
 
-  const [programme, items, logs, checks] = await Promise.all([
+  const [programme, items, logs, checks, history] = await Promise.all([
     getProgramme(session.programmeId),
     getProgrammeItems(session.programmeId),
     getSessionLogs(session.id),
     getWarmupChecks(session.id),
+    getRecentExerciseLogs(),
   ]);
-  const history = await getRecentExerciseLogs(
-    items.filter((item) => !item.isWarmup).map((item) => item.exerciseId),
-  );
 
   return (
     <Shell title={programme?.name ?? "Session"}>

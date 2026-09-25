@@ -2,7 +2,7 @@ import Link from "next/link";
 import { logoutAction } from "@/lib/actions/auth";
 
 const links = [
-  { href: "/", label: "New session" },
+  { href: "/", label: "Session" },
   { href: "/history", label: "History" },
   { href: "/programme", label: "Programmes" },
 ] as const;
@@ -22,7 +22,7 @@ export function Shell({
             Training log
           </p>
           <h1 className="font-display text-3xl tracking-tight text-ink">
-            {title ?? "New session"}
+            {title ?? "Session"}
           </h1>
         </div>
         <form action={logoutAction}>

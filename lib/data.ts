@@ -206,28 +206,18 @@ export async function getProgrammeItems(
   const { data, error } = await supabaseAdmin()
     .from("programme_exercises")
     .select(
-      "id, programme_id, exercise_id, sort_order, is_warmup, target_sets, target_reps, target_weight_kg, notes",
+      "id, programme_id, exercise_id, sort_order, is_warmup, target_sets, target_reps, target_weight_kg, notes, exercises(id, name, cues, laterality, tracks_duration)",
     )
     .eq("programme_id", programmeId)
     .order("sort_order", { ascending: true });
 
   throwIfError(error);
-  const rows = (data ?? []) as ProgrammeExerciseRow[];
-  if (rows.length === 0) return [];
-
-  const exerciseIds = [...new Set(rows.map((row) => row.exercise_id))];
-  const { data: exercises, error: exerciseError } = await supabaseAdmin()
-    .from("exercises")
-    .select("id, name, cues, laterality, tracks_duration")
-    .in("id", exerciseIds);
-
-  throwIfError(exerciseError);
-  const byId = new Map(
-    ((exercises ?? []) as ExerciseRow[]).map((exercise) => [exercise.id, exercise]),
-  );
+  const rows = (data ?? []) as unknown as Array<
+    ProgrammeExerciseRow & { exercises: ExerciseRow | ExerciseRow[] | null }
+  >;
 
   return rows.map((row) => {
-    const exercise = byId.get(row.exercise_id);
+    const exercise = Array.isArray(row.exercises) ? row.exercises[0] : row.exercises;
     if (!exercise) {
       throw new Error(`Exercise ${row.exercise_id} is missing from the catalogue.`);
     }
@@ -347,16 +337,11 @@ export async function getWarmupChecks(sessionId: string): Promise<WarmupCheck[]>
   return getWarmupChecksForSessions([sessionId]);
 }
 
-/** Recent logs for the given exercises, newest first. Used to prefill. */
-export async function getRecentExerciseLogs(
-  exerciseIds: string[],
-  limit = 200,
-): Promise<ExerciseLog[]> {
-  if (exerciseIds.length === 0) return [];
+/** The most recent exercise logs, newest first. Used to prefill and show last time. */
+export async function getRecentExerciseLogs(limit = 300): Promise<ExerciseLog[]> {
   const { data, error } = await supabaseAdmin()
     .from("exercise_logs")
     .select(EXERCISE_LOG_COLUMNS)
-    .in("exercise_id", exerciseIds)
     .order("completed_at", { ascending: false })
     .limit(limit);
 

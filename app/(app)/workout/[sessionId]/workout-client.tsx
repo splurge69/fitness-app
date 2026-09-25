@@ -1,7 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useEffect,
+  useMemo,
+  useOptimistic,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { ExerciseArt } from "@/components/exercise-art";
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import {
@@ -9,6 +15,7 @@ import {
   type TimedWarmup,
 } from "@/components/session-log-list";
 import { NumberStepper } from "@/components/stepper";
+import { SubmitButton } from "@/components/submit-button";
 import {
   checkWarmupAction,
   deleteExerciseLogAction,
@@ -30,12 +37,22 @@ import {
   type LogEntry,
 } from "@/lib/workout";
 
+type LogChange =
+  | { kind: "save"; log: ExerciseLog }
+  | { kind: "remove"; exerciseId: string };
+
+function applyLogChange(logs: ExerciseLog[], change: LogChange): ExerciseLog[] {
+  const exerciseId = change.kind === "save" ? change.log.exerciseId : change.exerciseId;
+  const rest = logs.filter((log) => log.exerciseId !== exerciseId);
+  return change.kind === "save" ? [...rest, change.log] : rest;
+}
+
 export function WorkoutClient({
   sessionId,
   completed,
   items,
-  logs,
-  checks,
+  logs: savedLogs,
+  checks: savedChecks,
   history,
 }: {
   sessionId: string;
@@ -45,8 +62,14 @@ export function WorkoutClient({
   checks: WarmupCheck[];
   history: ExerciseLog[];
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const [finishing, startFinishing] = useTransition();
+  // Taps update the screen straight away; the save catches up in the background.
+  const [logs, changeLogs] = useOptimistic(savedLogs, applyLogChange);
+  const [checks, addCheck] = useOptimistic(
+    savedChecks,
+    (current: WarmupCheck[], check: WarmupCheck) => [...current, check],
+  );
   // null = follow the programme order; "review" = the review screen.
   const [focusId, setFocusId] = useState<string | null>(null);
   const workItems = useMemo(() => workItemsOf(items), [items]);
@@ -59,10 +82,10 @@ export function WorkoutClient({
     [items, checks],
   );
 
-  function run(task: () => Promise<void>) {
+  function save(optimistic: () => void, task: () => Promise<void>) {
     startTransition(async () => {
+      optimistic();
       await task();
-      router.refresh();
     });
   }
 
@@ -81,18 +104,27 @@ export function WorkoutClient({
   }
 
   if (step.kind === "warmup") {
+    const item = step.item;
     return (
       <div className="space-y-4">
         <WarmupCard
-          key={step.item.id}
+          key={item.id}
           sessionId={sessionId}
-          item={step.item}
-          pending={pending}
+          item={item}
           onDone={(durationSeconds) =>
-            run(() => checkWarmupAction(sessionId, step.item.id, durationSeconds))
+            save(
+              () =>
+                addCheck({
+                  sessionId,
+                  programmeExerciseId: item.id,
+                  durationSeconds,
+                  completedAt: new Date().toISOString(),
+                }),
+              () => checkWarmupAction(sessionId, item.id, durationSeconds),
+            )
           }
         />
-        <SessionFooter sessionId={sessionId} pending={pending} />
+        <SessionFooter sessionId={sessionId} />
       </div>
     );
   }
@@ -123,11 +155,11 @@ export function WorkoutClient({
           </div>
           <button
             type="button"
-            disabled={pending}
-            onClick={() => run(() => finishSessionAction(sessionId))}
+            disabled={finishing}
+            onClick={() => startFinishing(() => finishSessionAction(sessionId))}
             className="mt-6 w-full rounded-2xl bg-ink px-4 py-4 text-base font-medium text-paper disabled:opacity-60"
           >
-            Mark session complete
+            {finishing ? "Finishing…" : "Mark session complete"}
           </button>
         </div>
         <DeleteSessionButton sessionId={sessionId} label="Delete this session" />
@@ -146,25 +178,41 @@ export function WorkoutClient({
         onSelect={(item) => setFocusId(item.id)}
       />
       <WorkCard
-        key={`${focused.id}-${current?.id ?? "new"}`}
+        key={`${focused.id}-${current ? "logged" : "new"}`}
         item={focused}
         current={current}
         previous={lastLogForExercise(history, focused.exerciseId, sessionId)}
-        pending={pending}
         onSave={(entry) => {
-          setFocusId(nextWorkItem(items, logs, focused.id)?.id ?? "review");
-          run(() =>
-            saveExerciseLogAction({
-              sessionId,
-              exerciseId: focused.exerciseId,
-              programmeExerciseId: focused.id,
-              exerciseName: focused.name,
-              ...entry,
-            }),
+          const log: ExerciseLog = {
+            id: `pending-${focused.exerciseId}`,
+            sessionId,
+            exerciseId: focused.exerciseId,
+            programmeExerciseId: focused.id,
+            exerciseNameSnapshot: focused.name,
+            completedAt: new Date().toISOString(),
+            ...entry,
+          };
+          setFocusId(
+            nextWorkItem(items, applyLogChange(logs, { kind: "save", log }), focused.id)
+              ?.id ?? "review",
+          );
+          save(
+            () => changeLogs({ kind: "save", log }),
+            () =>
+              saveExerciseLogAction({
+                sessionId,
+                exerciseId: focused.exerciseId,
+                programmeExerciseId: focused.id,
+                exerciseName: focused.name,
+                ...entry,
+              }),
           );
         }}
         onRemove={() =>
-          run(() => deleteExerciseLogAction(sessionId, focused.exerciseId))
+          save(
+            () => changeLogs({ kind: "remove", exerciseId: focused.exerciseId }),
+            () => deleteExerciseLogAction(sessionId, focused.exerciseId),
+          )
         }
       />
       <button
@@ -174,7 +222,7 @@ export function WorkoutClient({
       >
         Review session
       </button>
-      <SessionFooter sessionId={sessionId} pending={pending} />
+      <SessionFooter sessionId={sessionId} />
     </div>
   );
 }
@@ -199,12 +247,10 @@ function timedWarmupsFor(
 function WarmupCard({
   sessionId,
   item,
-  pending,
   onDone,
 }: {
   sessionId: string;
   item: ProgrammeExercise;
-  pending: boolean;
   onDone: (durationSeconds: number | null) => void;
 }) {
   const timer = useStopwatch(`timer:${sessionId}:${item.id}`);
@@ -255,7 +301,6 @@ function WarmupCard({
 
       <button
         type="button"
-        disabled={pending}
         onClick={() => {
           const seconds = item.tracksDuration && timer.seconds > 0 ? timer.seconds : null;
           timer.clear();
@@ -273,32 +318,52 @@ function WarmupCard({
 
 type StopwatchState = { baseSeconds: number; startedAt: number | null };
 
+const STOPPED: StopwatchState = { baseSeconds: 0, startedAt: null };
+const storageListeners = new Set<() => void>();
+
+function subscribeToStorage(listener: () => void) {
+  storageListeners.add(listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    storageListeners.delete(listener);
+    window.removeEventListener("storage", listener);
+  };
+}
+
+function readStorage(key: string): string {
+  try {
+    return window.localStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStorage(key: string, value: string | null) {
+  try {
+    if (value === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, value);
+  } catch {}
+  storageListeners.forEach((listener) => listener());
+}
+
 /**
  * A stopwatch that survives the phone locking or the page reloading: it keeps
- * the start time, not a tick count, and mirrors itself to localStorage.
+ * the start time, not a tick count, in localStorage.
  */
 function useStopwatch(storageKey: string) {
-  const [state, setState] = useState<StopwatchState>({
-    baseSeconds: 0,
-    startedAt: null,
-  });
-  const [loaded, setLoaded] = useState(false);
+  const raw = useSyncExternalStore(
+    subscribeToStorage,
+    () => readStorage(storageKey),
+    () => "",
+  );
+  const state = useMemo<StopwatchState>(() => {
+    try {
+      return raw ? (JSON.parse(raw) as StopwatchState) : STOPPED;
+    } catch {
+      return STOPPED;
+    }
+  }, [raw]);
   const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(storageKey);
-      if (saved) setState(JSON.parse(saved) as StopwatchState);
-    } catch {}
-    setLoaded(true);
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (!loaded) return;
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(state));
-    } catch {}
-  }, [loaded, storageKey, state]);
 
   useEffect(() => {
     if (state.startedAt === null) return;
@@ -306,27 +371,26 @@ function useStopwatch(storageKey: string) {
     return () => window.clearInterval(id);
   }, [state.startedAt]);
 
-  const seconds =
+  const running = state.startedAt !== null;
+  const seconds = Math.floor(
     state.baseSeconds +
-    (state.startedAt === null ? 0 : Math.max(0, (now - state.startedAt) / 1000));
+      (running ? Math.max(0, (now - state.startedAt!) / 1000) : 0),
+  );
+  const store = (next: StopwatchState) =>
+    writeStorage(storageKey, JSON.stringify(next));
 
   return {
-    seconds: Math.floor(seconds),
-    running: state.startedAt !== null,
+    seconds,
+    running,
     start: () => {
       const at = Date.now();
       setNow(at);
-      setState((prev) => ({ ...prev, startedAt: at }));
+      store({ baseSeconds: state.baseSeconds, startedAt: at });
     },
-    pause: () => setState({ baseSeconds: Math.floor(seconds), startedAt: null }),
-    reset: () => setState({ baseSeconds: 0, startedAt: null }),
-    set: (value: number) =>
-      setState({ baseSeconds: Math.max(0, value), startedAt: null }),
-    clear: () => {
-      try {
-        window.localStorage.removeItem(storageKey);
-      } catch {}
-    },
+    pause: () => store({ baseSeconds: seconds, startedAt: null }),
+    reset: () => writeStorage(storageKey, null),
+    set: (value: number) => store({ baseSeconds: Math.max(0, value), startedAt: null }),
+    clear: () => writeStorage(storageKey, null),
   };
 }
 
@@ -334,14 +398,12 @@ function WorkCard({
   item,
   current,
   previous,
-  pending,
   onSave,
   onRemove,
 }: {
   item: ProgrammeExercise;
   current: ExerciseLog | null;
   previous: ExerciseLog | null;
-  pending: boolean;
   onSave: (entry: LogEntry) => void;
   onRemove: () => void;
 }) {
@@ -375,7 +437,6 @@ function WorkCard({
           </p>
           <button
             type="button"
-            disabled={pending}
             onClick={onRemove}
             className="min-h-11 min-w-11 text-sm text-accent"
           >
@@ -411,7 +472,6 @@ function WorkCard({
 
       <button
         type="button"
-        disabled={pending}
         onClick={() => onSave(entry)}
         className="w-full rounded-3xl bg-accent px-4 py-5 text-lg font-medium text-accent-ink disabled:opacity-60"
       >
@@ -464,23 +524,16 @@ function ExerciseChips({
   );
 }
 
-function SessionFooter({
-  sessionId,
-  pending,
-}: {
-  sessionId: string;
-  pending: boolean;
-}) {
+function SessionFooter({ sessionId }: { sessionId: string }) {
   return (
     <>
       <form action={finishSessionAction.bind(null, sessionId)} className="pt-2">
-        <button
-          type="submit"
-          disabled={pending}
+        <SubmitButton
+          pendingLabel="Ending…"
           className="w-full text-sm text-muted underline decoration-line underline-offset-4"
         >
           End session early
-        </button>
+        </SubmitButton>
       </form>
       <DeleteSessionButton sessionId={sessionId} label="Delete this session" />
     </>
