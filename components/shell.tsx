@@ -2,9 +2,9 @@ import Link from "next/link";
 import { logoutAction } from "@/lib/actions/auth";
 
 const links = [
-  { href: "/", label: "Today" },
+  { href: "/", label: "New session" },
   { href: "/history", label: "History" },
-  { href: "/programme", label: "Programme" },
+  { href: "/programme", label: "Programmes" },
 ] as const;
 
 export function Shell({
@@ -19,10 +19,10 @@ export function Shell({
       <header className="mb-6 flex items-end justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-            Rehab log
+            Training log
           </p>
           <h1 className="font-display text-3xl tracking-tight text-ink">
-            {title ?? "ACL tracker"}
+            {title ?? "New session"}
           </h1>
         </div>
         <form action={logoutAction}>

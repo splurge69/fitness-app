@@ -1,17 +1,16 @@
-import { ExerciseArt } from "@/components/exercise-art";
+import Link from "next/link";
 import { Shell } from "@/components/shell";
-import { startWorkoutAction } from "@/lib/actions/sessions";
+import { SubmitButton } from "@/components/submit-button";
+import { resumeWorkoutAction, startWorkoutAction } from "@/lib/actions/sessions";
+import { getCompletedSessions, getOpenSession, getProgrammes } from "@/lib/data";
 import {
-  countSessionsThisWeek,
-  getActiveProgramme,
-  getLastCompletedSession,
-  getOpenSession,
-  getProgrammeItems,
-} from "@/lib/data";
-import { formatHoursSince, getFrequencyStatus } from "@/lib/frequency";
-import { muscleFor } from "@/lib/muscles";
+  formatHoursSince,
+  getFrequencyStatus,
+  startOfWeek,
+} from "@/lib/frequency";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { describeSupabaseError } from "@/lib/supabase-error";
+import type { Programme, Session } from "@/lib/types";
 
 export default async function HomePage() {
   if (!isSupabaseConfigured()) {
@@ -22,20 +21,16 @@ export default async function HomePage() {
     );
   }
 
-  let programme;
-  let openSession;
-  let lastSession;
-  let sessionsThisWeek;
-  let items = [];
+  let programmes: Programme[];
+  let openSession: Session | null;
+  let completed: Session[];
 
   try {
-    [programme, openSession, lastSession, sessionsThisWeek] = await Promise.all([
-      getActiveProgramme(),
+    [programmes, openSession, completed] = await Promise.all([
+      getProgrammes(),
       getOpenSession(),
-      getLastCompletedSession(),
-      countSessionsThisWeek(),
+      getCompletedSessions(),
     ]);
-    items = programme ? await getProgrammeItems(programme.id) : [];
   } catch (error) {
     console.error("Home data failed", error);
     return (
@@ -44,17 +39,15 @@ export default async function HomePage() {
       </Shell>
     );
   }
-  const working = items.filter((item) => !item.isWarmup);
-  const frequency = getFrequencyStatus({
-    lastCompletedAt: lastSession?.completedAt
-      ? new Date(lastSession.completedAt)
-      : null,
-    sessionsThisWeek,
-    now: new Date(),
-    minHoursBetween: programme?.minHoursBetweenSessions ?? 48,
-    targetPerWeek: programme?.targetSessionsPerWeek ?? 2,
-    minPerWeek: programme?.minSessionsPerWeek ?? 1,
-  });
+
+  const now = new Date();
+  const weekStart = startOfWeek(now).getTime();
+  const thisWeek = completed.filter(
+    (session) => new Date(session.completedAt!).getTime() >= weekStart,
+  );
+  const last = completed[0] ?? null;
+  const nameOf = (id: string) =>
+    programmes.find((programme) => programme.id === id)?.name ?? "Session";
 
   return (
     <Shell>
@@ -63,89 +56,117 @@ export default async function HomePage() {
           This week
         </p>
         <p className="mt-2 font-display text-3xl text-ink">
-          {frequency.sessionsThisWeek} / {frequency.targetPerWeek}
+          {thisWeek.length} {thisWeek.length === 1 ? "session" : "sessions"}
         </p>
         <p className="mt-2 text-sm text-muted">
-          {frequency.weeklyLabel === "done"
-            ? "Target hit. Extra sessions are optional."
-            : frequency.weeklyLabel === "on-track"
-              ? "Minimum done. One more session would hit the target."
-              : "No completed session this week yet."}
+          Last session:{" "}
+          {last
+            ? `${nameOf(last.programmeId)}, ${formatHoursSince(
+                (now.getTime() - new Date(last.completedAt!).getTime()) / 36e5,
+              ).toLowerCase()}`
+            : "none yet"}
         </p>
-        <p className="mt-4 text-sm text-ink">
-          Last session: {formatHoursSince(frequency.hoursSinceLast)}
-        </p>
+      </section>
+
+      {openSession ? (
+        <form action={resumeWorkoutAction} className="mt-5">
+          <SubmitButton
+            pendingLabel="Opening…"
+            className="w-full rounded-3xl bg-ink px-4 py-5 text-left text-paper"
+          >
+            <span className="block text-lg font-medium">Resume session</span>
+            <span className="mt-1 block text-sm opacity-80">
+              {nameOf(openSession.programmeId)} · started{" "}
+              {new Date(openSession.startedAt).toLocaleString(undefined, {
+                weekday: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </SubmitButton>
+        </form>
+      ) : (
+        <section className="mt-6">
+          <h2 className="font-display text-2xl text-ink">Start a session</h2>
+          {programmes.length === 0 ? (
+            <p className="mt-3 text-sm text-muted">
+              No programmes yet.{" "}
+              <Link href="/programme" className="text-ink underline underline-offset-4">
+                Add one
+              </Link>
+              .
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-3">
+              {programmes.map((programme) => (
+                <li key={programme.id}>
+                  <StartButton
+                    programme={programme}
+                    completed={completed}
+                    thisWeek={thisWeek}
+                    now={now}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+    </Shell>
+  );
+}
+
+function StartButton({
+  programme,
+  completed,
+  thisWeek,
+  now,
+}: {
+  programme: Programme;
+  completed: Session[];
+  thisWeek: Session[];
+  now: Date;
+}) {
+  const last = completed.find((session) => session.programmeId === programme.id);
+  const frequency = getFrequencyStatus({
+    lastCompletedAt: last?.completedAt ? new Date(last.completedAt) : null,
+    sessionsThisWeek: thisWeek.filter(
+      (session) => session.programmeId === programme.id,
+    ).length,
+    now,
+    minHoursBetween: programme.minHoursBetweenSessions,
+    targetPerWeek: programme.targetSessionsPerWeek,
+    minPerWeek: programme.minSessionsPerWeek,
+  });
+
+  return (
+    <form action={startWorkoutAction.bind(null, programme.id)}>
+      <SubmitButton
+        pendingLabel="Starting…"
+        className="w-full rounded-3xl border border-line bg-card px-5 py-4 text-left"
+      >
+        <span className="flex items-center justify-between gap-3">
+          <span className="text-lg font-medium text-ink">{programme.name}</span>
+          <span className="text-2xl text-ink" aria-hidden>
+            ›
+          </span>
+        </span>
+        <span className="mt-1 block text-sm text-muted">
+          {frequency.sessionsThisWeek} / {frequency.targetPerWeek} this week ·{" "}
+          {last ? formatHoursSince(frequency.hoursSinceLast) : "never done"}
+        </span>
         {!frequency.canTrain && frequency.nextEligibleAt ? (
-          <p className="mt-2 text-sm text-accent">
-            Leave 48 hours. Next eligible{" "}
+          <span className="mt-1 block text-sm text-accent">
+            Rest until{" "}
             {frequency.nextEligibleAt.toLocaleString(undefined, {
               weekday: "short",
               hour: "2-digit",
               minute: "2-digit",
             })}
-            .
-          </p>
-        ) : (
-          <p className="mt-2 text-sm text-good">Enough rest. You can train.</p>
-        )}
-      </section>
-
-      <form action={startWorkoutAction} className="mt-5">
-        <button
-          type="submit"
-          className="w-full rounded-3xl bg-ink px-4 py-5 text-lg font-medium text-paper"
-        >
-          {openSession ? "Resume session" : "Start session"}
-        </button>
-      </form>
-
-      {programme ? (
-        <section className="mt-8">
-          <div className="flex items-end justify-between">
-            <h2 className="font-display text-2xl text-ink">{programme.name}</h2>
-            <p className="text-sm text-muted">{working.length} lifts</p>
-          </div>
-          {programme.notes ? (
-            <p className="mt-2 text-sm text-muted">{programme.notes}</p>
-          ) : null}
-          <ol className="mt-4 space-y-3">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center gap-3 rounded-2xl border border-line bg-card px-3 py-3"
-              >
-                <ExerciseArt
-                  name={item.name}
-                  exerciseId={item.exerciseId}
-                  size="md"
-                />
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-[0.14em] text-muted">
-                    {item.isWarmup
-                      ? "Warm-up"
-                      : muscleFor(item.name, item.exerciseId) ?? "Work"}
-                  </p>
-                  <p className="mt-1 text-lg text-ink">{item.name}</p>
-                  <p className="mt-1 text-sm text-muted">
-                    {[
-                      item.targetSets ? `${item.targetSets} sets` : null,
-                      item.targetReps ? `${item.targetReps} reps` : null,
-                      item.targetWeightKg ? `${item.targetWeightKg} kg` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || "No target set"}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : (
-        <p className="mt-8 text-muted">
-          No active programme yet. Run the seed SQL, then refresh.
-        </p>
-      )}
-    </Shell>
+          </span>
+        ) : null}
+      </SubmitButton>
+    </form>
   );
 }
 

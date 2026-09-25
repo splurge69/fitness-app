@@ -101,6 +101,14 @@ export function ProgrammeEditor({
                 Warm-up
               </label>
               <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="tracksDuration"
+                  defaultChecked={item.tracksDuration}
+                />
+                Log minutes
+              </label>
+              <label className="flex items-center gap-2">
                 Laterality
                 <select
                   name="laterality"
@@ -108,7 +116,7 @@ export function ProgrammeEditor({
                   className="rounded-xl border border-line bg-paper px-2 py-1"
                 >
                   <option value="none">Single</option>
-                  <option value="bilateral">Both sides, alternating</option>
+                  <option value="bilateral">Both sides (a set is L + R)</option>
                 </select>
               </label>
             </div>
@@ -188,13 +196,17 @@ export function ProgrammeEditor({
               <input type="checkbox" name="isWarmup" />
               Warm-up
             </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="tracksDuration" />
+              Log minutes
+            </label>
             <select
               name="laterality"
               defaultValue="none"
               className="rounded-xl border border-line bg-card px-2 py-1"
             >
               <option value="none">Single</option>
-              <option value="bilateral">Both sides, alternating</option>
+              <option value="bilateral">Both sides (a set is L + R)</option>
             </select>
           </div>
           <button

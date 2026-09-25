@@ -1,12 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/session";
 import {
   addProgrammeExercise,
+  createProgramme,
   moveProgrammeExercise,
   removeProgrammeExercise,
   updateExercise,
+  updateProgramme,
   updateProgrammeExercise,
 } from "@/lib/data";
 import type { Laterality } from "@/lib/types";
@@ -34,6 +37,7 @@ export async function saveProgrammeItemAction(formData: FormData): Promise<void>
     name: String(formData.get("name") ?? "").trim(),
     cues: emptyToNull(formData.get("cues")),
     laterality: String(formData.get("laterality") ?? "none") as Laterality,
+    tracksDuration: formData.get("tracksDuration") === "on",
   });
 
   await updateProgrammeExercise({
@@ -45,7 +49,7 @@ export async function saveProgrammeItemAction(formData: FormData): Promise<void>
     isWarmup: formData.get("isWarmup") === "on",
   });
 
-  revalidatePath("/programme");
+  revalidatePath("/programme", "layout");
 }
 
 export async function addProgrammeItemAction(formData: FormData): Promise<void> {
@@ -58,6 +62,7 @@ export async function addProgrammeItemAction(formData: FormData): Promise<void> 
     name: String(formData.get("name") ?? "").trim(),
     cues: emptyToNull(formData.get("cues")),
     laterality: String(formData.get("laterality") ?? "none") as Laterality,
+    tracksDuration: formData.get("tracksDuration") === "on",
     isWarmup: formData.get("isWarmup") === "on",
     targetSets: optionalInt(formData.get("targetSets")),
     targetReps: optionalInt(formData.get("targetReps")),
@@ -65,7 +70,7 @@ export async function addProgrammeItemAction(formData: FormData): Promise<void> 
     notes: emptyToNull(formData.get("notes")),
   });
 
-  revalidatePath("/programme");
+  revalidatePath("/programme", "layout");
 }
 
 export async function removeProgrammeItemAction(formData: FormData): Promise<void> {
@@ -73,7 +78,7 @@ export async function removeProgrammeItemAction(formData: FormData): Promise<voi
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Missing programme item");
   await removeProgrammeExercise(id);
-  revalidatePath("/programme");
+  revalidatePath("/programme", "layout");
 }
 
 export async function moveProgrammeItemAction(formData: FormData): Promise<void> {
@@ -84,5 +89,31 @@ export async function moveProgrammeItemAction(formData: FormData): Promise<void>
     throw new Error("Invalid move");
   }
   await moveProgrammeExercise(id, direction);
+  revalidatePath("/programme", "layout");
+}
+
+export async function createProgrammeAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) throw new Error("Give the programme a name");
+  const programme = await createProgramme(name);
   revalidatePath("/programme");
+  redirect(`/programme/${programme.id}`);
+}
+
+export async function saveProgrammeAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!id || !name) throw new Error("A programme needs a name");
+
+  await updateProgramme({
+    id,
+    name,
+    notes: emptyToNull(formData.get("notes")),
+    minHoursBetweenSessions: optionalInt(formData.get("minHoursBetweenSessions")) ?? 0,
+    targetSessionsPerWeek: optionalInt(formData.get("targetSessionsPerWeek")) ?? 1,
+  });
+
+  revalidatePath("/programme", "layout");
 }

@@ -5,59 +5,79 @@ import { requireSession } from "@/lib/session";
 import {
   completeSession,
   createSession,
+  deleteExerciseLog,
   deleteSession,
-  deleteSetLog,
-  getActiveProgramme,
   getOpenSession,
-  insertSetLog,
+  getProgramme,
   insertWarmupCheck,
+  saveExerciseLog,
 } from "@/lib/data";
-import type { Side } from "@/lib/types";
 
-export async function startWorkoutAction(): Promise<void> {
+export async function startWorkoutAction(programmeId: string): Promise<void> {
   await requireSession();
   const open = await getOpenSession();
   if (open) {
     redirect(`/workout/${open.id}`);
   }
 
-  const programme = await getActiveProgramme();
+  const programme = await getProgramme(programmeId);
   if (!programme) {
-    throw new Error("No active programme. Add one in the programme editor.");
+    throw new Error("That programme no longer exists.");
   }
 
   const session = await createSession(programme.id);
   redirect(`/workout/${session.id}`);
 }
 
-export async function logSetAction(input: {
+export async function resumeWorkoutAction(): Promise<void> {
+  await requireSession();
+  const open = await getOpenSession();
+  redirect(open ? `/workout/${open.id}` : "/");
+}
+
+function wholeNumber(value: number, min: number): number {
+  if (!Number.isFinite(value)) throw new Error("Invalid number");
+  return Math.max(min, Math.round(value));
+}
+
+export async function saveExerciseLogAction(input: {
   sessionId: string;
   exerciseId: string;
   programmeExerciseId: string;
   exerciseName: string;
-  side: Side;
-  setNumber: number;
-  reps: number;
   weightKg: number;
+  reps: number;
+  sets: number;
 }): Promise<void> {
   await requireSession();
-  await insertSetLog(input);
+  if (!Number.isFinite(input.weightKg) || input.weightKg < 0) {
+    throw new Error("Invalid weight");
+  }
+  await saveExerciseLog({
+    ...input,
+    weightKg: Math.round(input.weightKg * 10) / 10,
+    reps: wholeNumber(input.reps, 1),
+    sets: wholeNumber(input.sets, 1),
+  });
 }
 
-export async function deleteSetAction(
+export async function deleteExerciseLogAction(
   sessionId: string,
-  setLogId: string,
+  exerciseId: string,
 ): Promise<void> {
   await requireSession();
-  await deleteSetLog(sessionId, setLogId);
+  await deleteExerciseLog(sessionId, exerciseId);
 }
 
 export async function checkWarmupAction(
   sessionId: string,
   programmeExerciseId: string,
+  durationSeconds: number | null = null,
 ): Promise<void> {
   await requireSession();
-  await insertWarmupCheck(sessionId, programmeExerciseId);
+  const duration =
+    durationSeconds === null ? null : wholeNumber(durationSeconds, 0);
+  await insertWarmupCheck(sessionId, programmeExerciseId, duration);
 }
 
 export async function finishSessionAction(sessionId: string): Promise<void> {

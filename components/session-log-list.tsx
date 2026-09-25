@@ -1,41 +1,64 @@
 import { ExerciseArt } from "@/components/exercise-art";
-import type { SetLog } from "@/lib/types";
-import { formatLoggedSet, groupLogsByName } from "@/lib/workout";
+import type { ExerciseLog } from "@/lib/types";
+import { formatDuration, formatLog } from "@/lib/workout";
+
+export type TimedWarmup = {
+  name: string;
+  exerciseId: string;
+  durationSeconds: number;
+};
 
 export function SessionLogList({
   logs,
-  empty = "No working sets logged yet.",
+  warmups = [],
+  empty = "Nothing logged yet.",
 }: {
-  logs: SetLog[];
+  logs: ExerciseLog[];
+  warmups?: TimedWarmup[];
   empty?: string;
 }) {
-  const groups = groupLogsByName(logs);
-
-  if (groups.length === 0) {
+  if (logs.length === 0 && warmups.length === 0) {
     return <p className="text-sm text-muted">{empty}</p>;
   }
 
   return (
     <ol className="space-y-3">
-      {groups.map((group) => (
-        <li key={group.name} className="flex gap-3">
-          <ExerciseArt
-            name={group.name}
-            exerciseId={group.sets[0]?.exerciseId}
-            size="sm"
-          />
-          <div className="min-w-0">
-          <p className="text-sm font-medium text-ink">{group.name}</p>
-          <ul className="mt-1 space-y-1 font-mono text-sm text-muted">
-            {group.sets.map((set, index) => (
-              <li key={set.id}>
-                {index + 1}. {formatLoggedSet(set)}
-              </li>
-            ))}
-          </ul>
-          </div>
-        </li>
+      {warmups.map((warmup) => (
+        <Row
+          key={warmup.exerciseId}
+          name={warmup.name}
+          exerciseId={warmup.exerciseId}
+          detail={formatDuration(warmup.durationSeconds)}
+        />
+      ))}
+      {logs.map((log) => (
+        <Row
+          key={log.id}
+          name={log.exerciseNameSnapshot}
+          exerciseId={log.exerciseId}
+          detail={formatLog(log)}
+        />
       ))}
     </ol>
+  );
+}
+
+function Row({
+  name,
+  exerciseId,
+  detail,
+}: {
+  name: string;
+  exerciseId: string;
+  detail: string;
+}) {
+  return (
+    <li className="flex items-center gap-3">
+      <ExerciseArt name={name} exerciseId={exerciseId} size="sm" />
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-ink">{name}</p>
+        <p className="mt-0.5 font-mono text-sm text-muted">{detail}</p>
+      </div>
+    </li>
   );
 }

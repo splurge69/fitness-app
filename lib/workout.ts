@@ -1,29 +1,19 @@
-import type { ProgrammeExercise, SetLog, Side, WarmupCheck } from "./types";
-import { formatSide } from "./rehab";
+import type { ExerciseLog, ProgrammeExercise, WarmupCheck } from "./types";
 
 export const DEFAULT_TARGET_SETS = 3;
+export const DEFAULT_TARGET_REPS = 8;
 
 export type WorkoutPhase =
   | { kind: "warmup"; item: ProgrammeExercise }
-  | { kind: "work"; item: ProgrammeExercise; side: Side; setNumber: number }
+  | { kind: "work"; item: ProgrammeExercise }
   | { kind: "complete" };
 
-export function targetSetsFor(item: ProgrammeExercise): number {
-  return item.targetSets ?? DEFAULT_TARGET_SETS;
-}
+export type LogEntry = { weightKg: number; reps: number; sets: number };
 
-export function sidesFor(item: ProgrammeExercise): Side[] {
-  return item.laterality === "bilateral" ? ["left", "right"] : ["none"];
-}
-
-export function setsLoggedFor(
-  logs: Pick<SetLog, "programmeExerciseId" | "side">[],
-  itemId: string,
-  side: Side,
-): number {
-  return logs.filter(
-    (log) => log.programmeExerciseId === itemId && log.side === side,
-  ).length;
+export function workItemsOf(items: ProgrammeExercise[]): ProgrammeExercise[] {
+  return [...items]
+    .filter((item) => !item.isWarmup)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export function isWarmupDone(
@@ -33,32 +23,16 @@ export function isWarmupDone(
   return checks.some((check) => check.programmeExerciseId === itemId);
 }
 
-export function isExerciseComplete(
-  item: ProgrammeExercise,
-  logs: Pick<SetLog, "programmeExerciseId" | "side">[],
-): boolean {
-  return sidesFor(item).every(
-    (side) => setsLoggedFor(logs, item.id, side) >= targetSetsFor(item),
-  );
-}
-
-export function nextAlternatingSide(
-  item: ProgrammeExercise,
-  logs: Pick<SetLog, "programmeExerciseId" | "side">[],
-  pendingSide?: Side,
-): Side {
-  const sides = sidesFor(item);
-  if (sides.length === 1) return sides[0];
-
-  const count = (side: Side) =>
-    setsLoggedFor(logs, item.id, side) + (pendingSide === side ? 1 : 0);
-
-  return count("left") <= count("right") ? "left" : "right";
+export function logFor<T extends Pick<ExerciseLog, "exerciseId">>(
+  logs: T[],
+  item: Pick<ProgrammeExercise, "exerciseId">,
+): T | null {
+  return logs.find((log) => log.exerciseId === item.exerciseId) ?? null;
 }
 
 export function getWorkoutStep(
   items: ProgrammeExercise[],
-  logs: Pick<SetLog, "programmeExerciseId" | "side">[],
+  logs: Pick<ExerciseLog, "exerciseId">[],
   checks: Pick<WarmupCheck, "programmeExerciseId">[],
 ): WorkoutPhase {
   const ordered = [...items].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -66,91 +40,53 @@ export function getWorkoutStep(
   const nextWarmup = ordered.find(
     (item) => item.isWarmup && !isWarmupDone(checks, item.id),
   );
-  if (nextWarmup) {
-    return { kind: "warmup", item: nextWarmup };
-  }
+  if (nextWarmup) return { kind: "warmup", item: nextWarmup };
 
-  for (const item of ordered.filter((entry) => !entry.isWarmup)) {
-    if (isExerciseComplete(item, logs)) continue;
-    const side = nextAlternatingSide(item, logs);
-    return {
-      kind: "work",
-      item,
-      side,
-      setNumber: setsLoggedFor(logs, item.id, side) + 1,
-    };
-  }
+  const nextWork = workItemsOf(ordered).find((item) => !logFor(logs, item));
+  if (nextWork) return { kind: "work", item: nextWork };
 
   return { kind: "complete" };
 }
 
-export function lastWeightForExercise(
-  logs: Array<{ exerciseId: string; side: Side; weightKg: number; completedAt: string }>,
-  exerciseId: string,
-  side: Side,
-): number | null {
-  const chronological = [...logs].sort((a, b) =>
-    a.completedAt.localeCompare(b.completedAt),
-  );
-  const newestFirst = chronological.reverse();
-  const sameSide = newestFirst.find(
-    (log) => log.exerciseId === exerciseId && log.side === side,
-  );
-  if (sameSide) return sameSide.weightKg;
-  const any = newestFirst.find((log) => log.exerciseId === exerciseId);
-  return any?.weightKg ?? null;
-}
-
-export function lastRepsForExercise(
-  logs: Array<{ exerciseId: string; side: Side; reps: number; completedAt: string }>,
-  exerciseId: string,
-  side: Side,
-): number | null {
-  const chronological = [...logs].sort((a, b) =>
-    a.completedAt.localeCompare(b.completedAt),
-  );
-  const newestFirst = chronological.reverse();
-  const sameSide = newestFirst.find(
-    (log) => log.exerciseId === exerciseId && log.side === side,
-  );
-  if (sameSide) return sameSide.reps;
-  const any = newestFirst.find((log) => log.exerciseId === exerciseId);
-  return any?.reps ?? null;
-}
-
-export function logsForItem(
-  logs: SetLog[],
-  itemId: string,
-  side?: Side,
-): SetLog[] {
-  return logs.filter((log) => {
-    if (log.programmeExerciseId !== itemId) return false;
-    return side === undefined || log.side === side;
-  });
-}
-
-export function nextSetNumber(
-  logs: Pick<SetLog, "programmeExerciseId" | "side" | "setNumber">[],
-  itemId: string,
-  side: Side,
-): number {
-  const matching = logs.filter(
-    (log) => log.programmeExerciseId === itemId && log.side === side,
-  );
-  if (matching.length === 0) return 1;
-  return Math.max(...matching.map((log) => log.setNumber)) + 1;
-}
-
+/** The next lift in programme order that is not logged yet, after `currentId`. */
 export function nextWorkItem(
   items: ProgrammeExercise[],
+  logs: Pick<ExerciseLog, "exerciseId">[],
   currentId: string,
 ): ProgrammeExercise | null {
-  const work = [...items]
-    .filter((item) => !item.isWarmup)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const work = workItemsOf(items);
   const index = work.findIndex((item) => item.id === currentId);
-  if (index < 0) return work[0] ?? null;
-  return work[index + 1] ?? null;
+  const rotated = [...work.slice(index + 1), ...work.slice(0, Math.max(index, 0))];
+  return rotated.find((item) => !logFor(logs, item)) ?? null;
+}
+
+/** The most recent log for this exercise from any other session. */
+export function lastLogForExercise(
+  history: ExerciseLog[],
+  exerciseId: string,
+  currentSessionId: string,
+): ExerciseLog | null {
+  return (
+    history
+      .filter(
+        (log) => log.exerciseId === exerciseId && log.sessionId !== currentSessionId,
+      )
+      .sort((a, b) => b.completedAt.localeCompare(a.completedAt))[0] ?? null
+  );
+}
+
+/** What to prefill: this session's log, else last time, else the programme target. */
+export function suggestedEntry(
+  item: ProgrammeExercise,
+  current: LogEntry | null,
+  previous: LogEntry | null,
+): LogEntry {
+  if (current) return { ...current };
+  return {
+    weightKg: previous?.weightKg ?? item.targetWeightKg ?? 0,
+    reps: previous?.reps ?? item.targetReps ?? DEFAULT_TARGET_REPS,
+    sets: previous?.sets ?? item.targetSets ?? DEFAULT_TARGET_SETS,
+  };
 }
 
 export function formatKg(value: number): string {
@@ -158,54 +94,33 @@ export function formatKg(value: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
-export function formatLoggedSet(log: Pick<SetLog, "side" | "weightKg" | "reps">): string {
-  const side = formatSide(log.side, true);
-  const prefix = side ? `${side} ` : "";
-  return `${prefix}${formatKg(log.weightKg)} kg × ${log.reps}`;
+export function formatLog(log: LogEntry): string {
+  return `${formatKg(log.weightKg)} kg × ${log.reps} × ${log.sets} ${
+    log.sets === 1 ? "set" : "sets"
+  }`;
 }
 
-export function lastSessionSetsForExercise(
-  logs: SetLog[],
-  exerciseId: string,
-  currentSessionId: string,
-): SetLog[] {
-  const previous = logs.filter(
-    (log) => log.exerciseId === exerciseId && log.sessionId !== currentSessionId,
-  );
-  if (previous.length === 0) return [];
-
-  const newest = [...previous].sort((a, b) =>
-    b.completedAt.localeCompare(a.completedAt),
-  )[0];
-  if (!newest) return [];
-
-  return previous
-    .filter((log) => log.sessionId === newest.sessionId)
-    .sort((a, b) => a.completedAt.localeCompare(b.completedAt));
+export function formatDuration(seconds: number): string {
+  const whole = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(whole / 60);
+  const rest = whole % 60;
+  if (rest === 0) return `${minutes} min`;
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
-export function groupLogsByName(
-  logs: SetLog[],
-): Array<{ name: string; sets: SetLog[] }> {
-  const groups: Array<{ name: string; sets: SetLog[] }> = [];
-  const indexByName = new Map<string, number>();
-
-  for (const log of logs) {
-    const existing = indexByName.get(log.exerciseNameSnapshot);
-    if (existing === undefined) {
-      indexByName.set(log.exerciseNameSnapshot, groups.length);
-      groups.push({ name: log.exerciseNameSnapshot, sets: [log] });
-      continue;
-    }
-    groups[existing].sets.push(log);
-  }
-
-  return groups;
+export function formatClock(seconds: number): string {
+  const whole = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(whole / 60);
+  return `${minutes}:${String(whole % 60).padStart(2, "0")}`;
 }
 
-export function summariseLogs(logs: SetLog[]): string[] {
-  return groupLogsByName(logs).map(({ name, sets }) => {
-    return `${name}: ${sets.map(formatLoggedSet).join(", ")}`;
-  });
+export function prescriptionFor(item: ProgrammeExercise): string {
+  const sets = item.targetSets ?? DEFAULT_TARGET_SETS;
+  return [
+    `${sets} ${sets === 1 ? "set" : "sets"}`,
+    item.targetReps ? `${item.targetReps} reps` : null,
+    item.targetWeightKg ? `${formatKg(item.targetWeightKg)} kg` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
-

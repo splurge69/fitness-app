@@ -1,17 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { ProgrammeExercise, SetLog } from "./types";
+import type { ExerciseLog, ProgrammeExercise } from "./types";
 import {
+  formatClock,
+  formatDuration,
   formatKg,
-  formatLoggedSet,
+  formatLog,
   getWorkoutStep,
-  lastRepsForExercise,
-  lastSessionSetsForExercise,
-  lastWeightForExercise,
-  nextAlternatingSide,
-  logsForItem,
-  nextSetNumber,
+  lastLogForExercise,
   nextWorkItem,
-  summariseLogs,
+  suggestedEntry,
 } from "./workout";
 
 function item(
@@ -19,9 +16,10 @@ function item(
 ): ProgrammeExercise {
   return {
     programmeId: "p1",
-    exerciseId: overrides.exerciseId ?? overrides.id,
+    exerciseId: overrides.exerciseId ?? `ex-${overrides.id}`,
     cues: null,
     laterality: "none",
+    tracksDuration: false,
     isWarmup: false,
     sortOrder: 10,
     targetSets: 3,
@@ -32,300 +30,97 @@ function item(
   };
 }
 
-function log(overrides: Partial<SetLog> & Pick<SetLog, "id">): SetLog {
+function log(overrides: Partial<ExerciseLog> & Pick<ExerciseLog, "id">): ExerciseLog {
   return {
     sessionId: "s1",
-    exerciseId: "ex",
+    exerciseId: "ex-e1",
     programmeExerciseId: "e1",
     exerciseNameSnapshot: "Lift",
-    side: "none",
-    setNumber: 1,
-    reps: 8,
     weightKg: 20,
+    reps: 8,
+    sets: 3,
     completedAt: "2026-09-15T10:00:00.000Z",
     ...overrides,
   };
 }
 
+const bike = item({ id: "w1", name: "Bike", isWarmup: true, sortOrder: 10 });
+const squat = item({ id: "e1", name: "Squat", sortOrder: 20 });
+const curl = item({ id: "e2", name: "Curl", sortOrder: 30 });
+const calf = item({ id: "e3", name: "Calf", sortOrder: 40 });
+const items = [calf, squat, bike, curl];
+
 describe("getWorkoutStep", () => {
-  const warmup = item({
-    id: "w1",
-    name: "Bike",
-    isWarmup: true,
-    sortOrder: 10,
-    laterality: "none",
-    targetSets: null,
-  });
-  const squat = item({
-    id: "e1",
-    exerciseId: "ex-squat",
-    name: "Bulgarian split squat",
-    laterality: "bilateral",
-    sortOrder: 20,
-    targetSets: 2,
+  it("starts with the warm-up", () => {
+    expect(getWorkoutStep(items, [], [])).toEqual({ kind: "warmup", item: bike });
   });
 
-  it("starts on the first incomplete warmup", () => {
-    expect(getWorkoutStep([warmup, squat], [], [])).toEqual({
-      kind: "warmup",
-      item: warmup,
-    });
+  it("moves to the first unlogged lift once warm-ups are ticked", () => {
+    const checks = [{ programmeExerciseId: "w1" }];
+    expect(getWorkoutStep(items, [], checks)).toEqual({ kind: "work", item: squat });
+    expect(
+      getWorkoutStep(items, [{ exerciseId: "ex-e1" }], checks),
+    ).toEqual({ kind: "work", item: curl });
   });
 
-  it("moves to the left side of a bilateral lift after warmup", () => {
-    const step = getWorkoutStep(
-      [warmup, squat],
-      [],
-      [{ programmeExerciseId: "w1" }],
-    );
-    expect(step).toMatchObject({
-      kind: "work",
-      item: squat,
-      side: "left",
-      setNumber: 1,
-    });
+  it("is complete when every lift has a log line", () => {
+    const checks = [{ programmeExerciseId: "w1" }];
+    const logs = [{ exerciseId: "ex-e1" }, { exerciseId: "ex-e2" }, { exerciseId: "ex-e3" }];
+    expect(getWorkoutStep(items, logs, checks)).toEqual({ kind: "complete" });
+  });
+});
+
+describe("nextWorkItem", () => {
+  it("skips lifts already logged and wraps round", () => {
+    expect(nextWorkItem(items, [], "e1")?.id).toBe("e2");
+    expect(nextWorkItem(items, [{ exerciseId: "ex-e2" }], "e1")?.id).toBe("e3");
+    expect(nextWorkItem(items, [{ exerciseId: "ex-e1" }], "e3")?.id).toBe("e2");
   });
 
-  it("alternates to the right after one left set", () => {
-    const step = getWorkoutStep(
-      [warmup, squat],
-      [{ programmeExerciseId: "e1", side: "left" }],
-      [{ programmeExerciseId: "w1" }],
-    );
-    expect(step).toMatchObject({
-      kind: "work",
-      side: "right",
-      setNumber: 1,
-    });
+  it("returns null when everything else is logged", () => {
+    const logs = [{ exerciseId: "ex-e2" }, { exerciseId: "ex-e3" }];
+    expect(nextWorkItem(items, logs, "e1")).toBeNull();
   });
+});
 
-  it("returns to the left after a left/right pair", () => {
-    const step = getWorkoutStep(
-      [warmup, squat],
-      [
-        { programmeExerciseId: "e1", side: "left" },
-        { programmeExerciseId: "e1", side: "right" },
-      ],
-      [{ programmeExerciseId: "w1" }],
-    );
-    expect(step).toMatchObject({
-      kind: "work",
-      side: "left",
-      setNumber: 2,
-    });
-  });
-
-  it("catches up the lagging side if one side was logged twice", () => {
-    const step = getWorkoutStep(
-      [warmup, squat],
-      [
-        { programmeExerciseId: "e1", side: "left" },
-        { programmeExerciseId: "e1", side: "left" },
-      ],
-      [{ programmeExerciseId: "w1" }],
-    );
-    expect(step).toMatchObject({
-      kind: "work",
-      side: "right",
-      setNumber: 1,
-    });
-  });
-
-  it("is complete when warmup and both sides are done", () => {
-    const logs: Pick<SetLog, "programmeExerciseId" | "side">[] = [
-      { programmeExerciseId: "e1", side: "left" },
-      { programmeExerciseId: "e1", side: "left" },
-      { programmeExerciseId: "e1", side: "right" },
-      { programmeExerciseId: "e1", side: "right" },
+describe("lastLogForExercise", () => {
+  it("returns the newest log from another session", () => {
+    const history = [
+      log({ id: "a", sessionId: "old", weightKg: 10, completedAt: "2026-09-01T10:00:00Z" }),
+      log({ id: "b", sessionId: "older", weightKg: 8, completedAt: "2026-08-01T10:00:00Z" }),
+      log({ id: "c", sessionId: "now", weightKg: 12, completedAt: "2026-09-20T10:00:00Z" }),
     ];
-    expect(
-      getWorkoutStep([warmup, squat], logs, [{ programmeExerciseId: "w1" }]),
-    ).toEqual({ kind: "complete" });
+    expect(lastLogForExercise(history, "ex-e1", "now")?.id).toBe("a");
+    expect(lastLogForExercise(history, "other", "now")).toBeNull();
   });
 });
 
-describe("lastWeightForExercise", () => {
-  const logs = [
-    {
-      exerciseId: "ext",
-      side: "left" as const,
-      weightKg: 20,
-      completedAt: "2026-09-01T10:00:00.000Z",
-    },
-    {
-      exerciseId: "ext",
-      side: "right" as const,
-      weightKg: 23,
-      completedAt: "2026-09-01T10:05:00.000Z",
-    },
-    {
-      exerciseId: "curl",
-      side: "left" as const,
-      weightKg: 7.5,
-      completedAt: "2026-09-01T10:10:00.000Z",
-    },
-  ];
-
-  it("prefills the newest weight for the same side", () => {
-    expect(lastWeightForExercise(logs, "ext", "right")).toBe(23);
-    expect(lastWeightForExercise(logs, "ext", "left")).toBe(20);
+describe("suggestedEntry", () => {
+  it("prefers this session, then last time, then the target", () => {
+    const current = { weightKg: 14, reps: 6, sets: 2 };
+    const previous = { weightKg: 12, reps: 8, sets: 3 };
+    const target = item({ id: "e1", name: "Squat", targetWeightKg: 10, targetReps: 10, targetSets: 4 });
+    expect(suggestedEntry(target, current, previous)).toEqual(current);
+    expect(suggestedEntry(target, null, previous)).toEqual(previous);
+    expect(suggestedEntry(target, null, null)).toEqual({ weightKg: 10, reps: 10, sets: 4 });
   });
 
-  it("falls back to any side when that side has no history", () => {
-    expect(lastWeightForExercise(logs, "curl", "right")).toBe(7.5);
-  });
-
-  it("returns null when the exercise has never been logged", () => {
-    expect(lastWeightForExercise(logs, "calf", "none")).toBeNull();
+  it("falls back to sensible defaults with no target", () => {
+    const bare = item({ id: "e1", name: "Row", targetSets: null, targetReps: null });
+    expect(suggestedEntry(bare, null, null)).toEqual({ weightKg: 0, reps: 8, sets: 3 });
   });
 });
 
-describe("session logging helpers", () => {
-  const squat = item({
-    id: "e1",
-    exerciseId: "ex-squat",
-    name: "Bulgarian split squat",
-    laterality: "bilateral",
-    sortOrder: 20,
-  });
-  const curl = item({
-    id: "e2",
-    exerciseId: "ex-curl",
-    name: "Hamstring curl",
-    sortOrder: 30,
+describe("formatting", () => {
+  it("formats a log line", () => {
+    expect(formatLog({ weightKg: 12, reps: 8, sets: 3 })).toBe("12 kg × 8 × 3 sets");
+    expect(formatLog({ weightKg: 7.5, reps: 10, sets: 1 })).toBe("7.5 kg × 10 × 1 set");
+    expect(formatKg(22.25)).toBe("22.3");
   });
 
-  it("lists logs for one programme item and side", () => {
-    const logs = [
-      log({ id: "1", programmeExerciseId: "e1", side: "left", setNumber: 1 }),
-      log({ id: "2", programmeExerciseId: "e1", side: "right", setNumber: 1 }),
-      log({ id: "3", programmeExerciseId: "e2", side: "none", setNumber: 1 }),
-    ];
-    expect(logsForItem(logs, "e1").map((entry) => entry.id)).toEqual(["1", "2"]);
-    expect(logsForItem(logs, "e1", "left").map((entry) => entry.id)).toEqual(["1"]);
-  });
-
-  it("uses the next set number after a deleted middle set", () => {
-    expect(nextSetNumber([], "e1", "left")).toBe(1);
-    expect(
-      nextSetNumber(
-        [
-          { programmeExerciseId: "e1", side: "left", setNumber: 1 },
-          { programmeExerciseId: "e1", side: "left", setNumber: 3 },
-        ],
-        "e1",
-        "left",
-      ),
-    ).toBe(4);
-  });
-
-  it("picks the next side after a set is logged", () => {
-    expect(nextAlternatingSide(squat, [])).toBe("left");
-    expect(nextAlternatingSide(squat, [], "left")).toBe("right");
-    expect(
-      nextAlternatingSide(
-        squat,
-        [{ programmeExerciseId: "e1", side: "left" }],
-        "right",
-      ),
-    ).toBe("left");
-    expect(nextAlternatingSide(curl, [])).toBe("none");
-  });
-
-  it("moves to the next working lift, then stops", () => {
-    expect(nextWorkItem([squat, curl], "e1")?.id).toBe("e2");
-    expect(nextWorkItem([squat, curl], "e2")).toBeNull();
-  });
-
-  it("summarises every actual set, not only the last one", () => {
-    expect(formatKg(20)).toBe("20");
-    expect(formatKg(22.5)).toBe("22.5");
-    expect(
-      formatLoggedSet({ side: "left", weightKg: 22.5, reps: 8 }),
-    ).toBe("L ACL 22.5 kg × 8");
-    expect(
-      summariseLogs([
-        log({
-          id: "1",
-          exerciseNameSnapshot: "Split squat",
-          side: "left",
-          weightKg: 20,
-          reps: 8,
-        }),
-        log({
-          id: "2",
-          exerciseNameSnapshot: "Split squat",
-          side: "left",
-          weightKg: 22.5,
-          reps: 6,
-        }),
-      ]),
-    ).toEqual(["Split squat: L ACL 20 kg × 8, L ACL 22.5 kg × 6"]);
-  });
-
-  it("returns the previous session's sets for a lift, excluding today", () => {
-    expect(
-      lastSessionSetsForExercise(
-        [
-          log({
-            id: "now",
-            sessionId: "today",
-            exerciseId: "ext",
-            completedAt: "2026-09-15T10:00:00.000Z",
-          }),
-          log({
-            id: "old-2",
-            sessionId: "last",
-            exerciseId: "ext",
-            side: "right",
-            weightKg: 23,
-            reps: 8,
-            completedAt: "2026-09-08T10:05:00.000Z",
-          }),
-          log({
-            id: "old-1",
-            sessionId: "last",
-            exerciseId: "ext",
-            side: "left",
-            weightKg: 20,
-            reps: 8,
-            completedAt: "2026-09-08T10:00:00.000Z",
-          }),
-          log({
-            id: "older",
-            sessionId: "older",
-            exerciseId: "ext",
-            completedAt: "2026-09-01T10:00:00.000Z",
-          }),
-        ],
-        "ext",
-        "today",
-      ).map((entry) => entry.id),
-    ).toEqual(["old-1", "old-2"]);
-  });
-});
-
-describe("lastRepsForExercise", () => {
-  it("returns the newest matching reps", () => {
-    expect(
-      lastRepsForExercise(
-        [
-          {
-            exerciseId: "ext",
-            side: "none",
-            reps: 8,
-            completedAt: "2026-09-01T10:00:00.000Z",
-          },
-          {
-            exerciseId: "ext",
-            side: "none",
-            reps: 10,
-            completedAt: "2026-09-08T10:00:00.000Z",
-          },
-        ],
-        "ext",
-        "none",
-      ),
-    ).toBe(10);
+  it("formats durations", () => {
+    expect(formatDuration(720)).toBe("12 min");
+    expect(formatDuration(750)).toBe("12:30");
+    expect(formatClock(65.9)).toBe("1:05");
   });
 });

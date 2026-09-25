@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import { HistoryCalendar } from "@/components/history-calendar";
-import { SessionLogList } from "@/components/session-log-list";
+import { SessionLogList, type TimedWarmup } from "@/components/session-log-list";
 import { Shell } from "@/components/shell";
 import { parseYearMonth, sessionDateKey, sessionsInMonth } from "@/lib/calendar";
-import { getAllSessions, getSessionLogs } from "@/lib/data";
+import {
+  getAllSessions,
+  getExerciseLogsForSessions,
+  getProgrammeItems,
+  getProgrammes,
+  getWarmupChecksForSessions,
+} from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { describeSupabaseError } from "@/lib/supabase-error";
+import type { ExerciseLog, ProgrammeExercise, Session, WarmupCheck } from "@/lib/types";
 
 export default async function HistoryPage({
   searchParams,
@@ -25,9 +32,32 @@ export default async function HistoryPage({
     );
   }
 
-  let sessions;
+  let sessions: Session[];
+  let visible: Session[];
+  let programmeNames: Map<string, string>;
+  let logs: ExerciseLog[];
+  let checks: WarmupCheck[];
+  let items: ProgrammeExercise[];
   try {
-    sessions = await getAllSessions();
+    const [allSessions, programmes] = await Promise.all([
+      getAllSessions(),
+      getProgrammes(),
+    ]);
+    sessions = allSessions;
+    programmeNames = new Map(programmes.map((p) => [p.id, p.name]));
+    visible = selectedDay
+      ? sessions.filter((session) => sessionDateKey(session) === selectedDay)
+      : sessionsInMonth(sessions, month);
+    const ids = visible.map((session) => session.id);
+    const programmeIds = [...new Set(visible.map((s) => s.programmeId))];
+    const [logRows, checkRows, itemLists] = await Promise.all([
+      getExerciseLogsForSessions(ids),
+      getWarmupChecksForSessions(ids),
+      Promise.all(programmeIds.map((id) => getProgrammeItems(id))),
+    ]);
+    logs = logRows;
+    checks = checkRows;
+    items = itemLists.flat();
   } catch (error) {
     return (
       <Shell title="History">
@@ -36,16 +66,7 @@ export default async function HistoryPage({
     );
   }
 
-  const visible = selectedDay
-    ? sessions.filter((session) => sessionDateKey(session) === selectedDay)
-    : sessionsInMonth(sessions, month);
-
-  const listed = await Promise.all(
-    visible.map(async (session) => ({
-      session,
-      logs: await getSessionLogs(session.id),
-    })),
-  );
+  const itemById = new Map(items.map((item) => [item.id, item]));
 
   return (
     <Shell title="History">
@@ -55,48 +76,77 @@ export default async function HistoryPage({
         sessions={sessions}
       />
 
-      {listed.length === 0 ? (
+      {visible.length === 0 ? (
         <p className="text-muted">
           {selectedDay
             ? "No sessions on this day."
             : "No sessions in this month yet."}
         </p>
       ) : (
-        <ol className="space-y-4">
-          {listed.map(({ session, logs }) => (
-            <li
-              key={session.id}
-              className="rounded-3xl border border-line bg-card p-5"
-            >
-              <p className="text-xs uppercase tracking-[0.16em] text-muted">
-                {session.completedAt ? "Completed" : "In progress"} ·{" "}
-                {new Date(
-                  session.completedAt ?? session.startedAt,
-                ).toLocaleString(undefined, {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                })}
-              </p>
-              <p className="mt-1 text-lg text-ink">
-                {logs.length} sets ·{" "}
-                {new Set(logs.map((log) => log.exerciseNameSnapshot)).size}{" "}
-                exercises
-              </p>
-              <div className="mt-3">
-                <SessionLogList logs={logs} empty="No sets logged." />
-              </div>
-              <div className="mt-4 flex items-center gap-4">
-                <Link
-                  href={`/workout/${session.id}`}
-                  className="text-sm text-ink underline decoration-line underline-offset-4"
-                >
-                  Open session
-                </Link>
-                <DeleteSessionButton sessionId={session.id} />
-              </div>
-            </li>
-          ))}
+        <ol className="space-y-3">
+          {visible.map((session) => {
+            const sessionLogs = logs.filter((log) => log.sessionId === session.id);
+            const warmups: TimedWarmup[] = checks.flatMap((check) => {
+              const item = itemById.get(check.programmeExerciseId);
+              if (check.sessionId !== session.id || !item || check.durationSeconds === null) {
+                return [];
+              }
+              return [
+                {
+                  name: item.name,
+                  exerciseId: item.exerciseId,
+                  durationSeconds: check.durationSeconds,
+                },
+              ];
+            });
+            return (
+              <li key={session.id}>
+                <details className="group rounded-3xl border border-line bg-card">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
+                    <span className="min-w-0">
+                      <span className="block text-lg font-medium text-ink">
+                        {programmeNames.get(session.programmeId) ?? "Session"}
+                      </span>
+                      <span className="mt-0.5 block text-sm text-muted">
+                        {new Date(
+                          session.completedAt ?? session.startedAt,
+                        ).toLocaleDateString(undefined, {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        })}{" "}
+                        · {sessionLogs.length}{" "}
+                        {sessionLogs.length === 1 ? "exercise" : "exercises"}
+                        {session.completedAt ? "" : " · in progress"}
+                      </span>
+                    </span>
+                    <span
+                      className="text-xl text-muted transition-transform group-open:rotate-90"
+                      aria-hidden
+                    >
+                      ›
+                    </span>
+                  </summary>
+                  <div className="border-t border-line px-5 pt-4 pb-5">
+                    <SessionLogList
+                      logs={sessionLogs}
+                      warmups={warmups}
+                      empty="Nothing logged."
+                    />
+                    <div className="mt-4 flex items-center gap-4">
+                      <Link
+                        href={`/workout/${session.id}`}
+                        className="text-sm text-ink underline decoration-line underline-offset-4"
+                      >
+                        Open session
+                      </Link>
+                      <DeleteSessionButton sessionId={session.id} />
+                    </div>
+                  </div>
+                </details>
+              </li>
+            );
+          })}
         </ol>
       )}
     </Shell>

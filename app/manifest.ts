@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "ACL tracker",
     short_name: "ACL",
-    description: "Personal ACL rehab session tracker",
+    description: "Personal training and ACL rehab tracker",
     start_url: "/",
     display: "standalone",
     background_color: "#f3ece0",

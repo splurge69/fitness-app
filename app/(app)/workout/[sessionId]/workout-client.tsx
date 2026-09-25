@@ -1,38 +1,34 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { ExerciseArt } from "@/components/exercise-art";
 import { DeleteSessionButton } from "@/components/delete-session-button";
-import { SessionLogList } from "@/components/session-log-list";
+import {
+  SessionLogList,
+  type TimedWarmup,
+} from "@/components/session-log-list";
 import { NumberStepper } from "@/components/stepper";
 import {
   checkWarmupAction,
-  deleteSetAction,
+  deleteExerciseLogAction,
   finishSessionAction,
-  logSetAction,
+  saveExerciseLogAction,
 } from "@/lib/actions/sessions";
-import type { ProgrammeExercise, SetLog, Side, WarmupCheck } from "@/lib/types";
-import { formatSide } from "@/lib/rehab";
+import type { ExerciseLog, ProgrammeExercise, WarmupCheck } from "@/lib/types";
 import { muscleFor } from "@/lib/muscles";
 import {
-  formatKg,
+  formatClock,
+  formatLog,
   getWorkoutStep,
-  isExerciseComplete,
-  formatLoggedSet,
-  lastRepsForExercise,
-  lastSessionSetsForExercise,
-  lastWeightForExercise,
-  logsForItem,
-  nextAlternatingSide,
-  nextSetNumber,
+  lastLogForExercise,
+  logFor,
   nextWorkItem,
-  setsLoggedFor,
-  sidesFor,
-  targetSetsFor,
+  prescriptionFor,
+  suggestedEntry,
+  workItemsOf,
+  type LogEntry,
 } from "@/lib/workout";
-
-type Focus = { itemId: string; side: Side };
 
 export function WorkoutClient({
   sessionId,
@@ -45,31 +41,23 @@ export function WorkoutClient({
   sessionId: string;
   completed: boolean;
   items: ProgrammeExercise[];
-  logs: SetLog[];
+  logs: ExerciseLog[];
   checks: WarmupCheck[];
-  history: SetLog[];
+  history: ExerciseLog[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [focus, setFocus] = useState<Focus | null>(null);
-  const workItems = useMemo(
-    () =>
-      [...items]
-        .filter((item) => !item.isWarmup)
-        .sort((a, b) => a.sortOrder - b.sortOrder),
-    [items],
-  );
+  // null = follow the programme order; "review" = the review screen.
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const workItems = useMemo(() => workItemsOf(items), [items]);
   const step = useMemo(
     () => getWorkoutStep(items, logs, checks),
     [items, logs, checks],
   );
-
-  const focusedItem =
-    (focus && workItems.find((item) => item.id === focus.itemId)) ||
-    (step.kind === "work" ? step.item : null);
-  const focusedSide =
-    focus?.side ??
-    (step.kind === "work" ? step.side : focusedItem ? sidesFor(focusedItem)[0] : "none");
+  const timedWarmups = useMemo(
+    () => timedWarmupsFor(items, checks),
+    [items, checks],
+  );
 
   function run(task: () => Promise<void>) {
     startTransition(async () => {
@@ -80,12 +68,15 @@ export function WorkoutClient({
 
   if (completed) {
     return (
-      <SessionReview
-        sessionId={sessionId}
-        logs={logs}
-        canFinish={false}
-        pending={pending}
-      />
+      <section className="space-y-4">
+        <div className="rounded-3xl border border-line bg-card p-5">
+          <h2 className="font-display text-3xl text-ink">That is the session</h2>
+          <div className="mt-4">
+            <SessionLogList logs={logs} warmups={timedWarmups} />
+          </div>
+        </div>
+        <DeleteSessionButton sessionId={sessionId} />
+      </section>
     );
   }
 
@@ -93,358 +84,338 @@ export function WorkoutClient({
     return (
       <div className="space-y-4">
         <WarmupCard
+          key={step.item.id}
+          sessionId={sessionId}
           item={step.item}
           pending={pending}
-          onDone={() =>
-            run(() => checkWarmupAction(sessionId, step.item.id))
+          onDone={(durationSeconds) =>
+            run(() => checkWarmupAction(sessionId, step.item.id, durationSeconds))
           }
         />
-        <EndSessionButton sessionId={sessionId} pending={pending} />
-        <DeleteSessionButton sessionId={sessionId} label="Delete this session" />
+        <SessionFooter sessionId={sessionId} pending={pending} />
       </div>
     );
   }
 
-  if (!focusedItem) {
+  const focused =
+    focusId === "review"
+      ? null
+      : (focusId && workItems.find((item) => item.id === focusId)) ||
+        (step.kind === "work" ? step.item : null);
+
+  if (!focused) {
     return (
-      <SessionReview
-        sessionId={sessionId}
-        logs={logs}
-        canFinish
-        pending={pending}
-        onFinish={() => run(() => finishSessionAction(sessionId))}
-        onBack={
-          workItems[0]
-            ? () => {
-                const last = workItems[workItems.length - 1];
-                setFocus({
-                  itemId: last.id,
-                  side: nextAlternatingSide(last, logs),
-                });
-              }
-            : undefined
-        }
-        workItems={workItems}
-        onJump={(item) =>
-          setFocus({
-            itemId: item.id,
-            side: nextAlternatingSide(item, logs),
-          })
-        }
-      />
+      <section className="space-y-4">
+        <ExerciseChips
+          items={workItems}
+          logs={logs}
+          selectedId={null}
+          onSelect={(item) => setFocusId(item.id)}
+        />
+        <div className="rounded-3xl border border-line bg-card p-5">
+          <h2 className="font-display text-3xl text-ink">Review this session</h2>
+          <p className="mt-2 text-sm text-muted">
+            {logs.length} of {workItems.length} exercises logged. Tap one above
+            to change it.
+          </p>
+          <div className="mt-4">
+            <SessionLogList logs={logs} warmups={timedWarmups} />
+          </div>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => run(() => finishSessionAction(sessionId))}
+            className="mt-6 w-full rounded-2xl bg-ink px-4 py-4 text-base font-medium text-paper disabled:opacity-60"
+          >
+            Mark session complete
+          </button>
+        </div>
+        <DeleteSessionButton sessionId={sessionId} label="Delete this session" />
+      </section>
     );
   }
 
+  const current = logFor(logs, focused);
+
   return (
     <div className="space-y-4">
-      <WorkCard
-        key={`${focusedItem.id}-${focusedSide}`}
-        sessionId={sessionId}
-        item={focusedItem}
-        side={focusedSide}
-        workItems={workItems}
+      <ExerciseChips
+        items={workItems}
         logs={logs}
-        history={history}
+        selectedId={focused.id}
+        onSelect={(item) => setFocusId(item.id)}
+      />
+      <WorkCard
+        key={`${focused.id}-${current?.id ?? "new"}`}
+        item={focused}
+        current={current}
+        previous={lastLogForExercise(history, focused.exerciseId, sessionId)}
         pending={pending}
-        onSelectExercise={(item) =>
-          setFocus({
-            itemId: item.id,
-            side: nextAlternatingSide(item, logs),
-          })
-        }
-        onSelectSide={(side) => setFocus({ itemId: focusedItem.id, side })}
-        onLog={(reps, weightKg) => {
-          setFocus({
-            itemId: focusedItem.id,
-            side: nextAlternatingSide(focusedItem, logs, focusedSide),
-          });
+        onSave={(entry) => {
+          setFocusId(nextWorkItem(items, logs, focused.id)?.id ?? "review");
           run(() =>
-            logSetAction({
+            saveExerciseLogAction({
               sessionId,
-              exerciseId: focusedItem.exerciseId,
-              programmeExerciseId: focusedItem.id,
-              exerciseName: focusedItem.name,
-              side: focusedSide,
-              setNumber: nextSetNumber(logs, focusedItem.id, focusedSide),
-              reps,
-              weightKg,
+              exerciseId: focused.exerciseId,
+              programmeExerciseId: focused.id,
+              exerciseName: focused.name,
+              ...entry,
             }),
           );
         }}
-        onDeleteSet={(setLogId) =>
-          run(() => deleteSetAction(sessionId, setLogId))
+        onRemove={() =>
+          run(() => deleteExerciseLogAction(sessionId, focused.exerciseId))
         }
-        onNext={() => {
-          const next = nextWorkItem(items, focusedItem.id);
-          if (next) {
-            setFocus({
-              itemId: next.id,
-              side: nextAlternatingSide(next, logs),
-            });
-            return;
-          }
-          setFocus(null);
-        }}
       />
-      <EndSessionButton sessionId={sessionId} pending={pending} />
-      <DeleteSessionButton sessionId={sessionId} label="Delete this session" />
+      <button
+        type="button"
+        onClick={() => setFocusId("review")}
+        className="w-full rounded-2xl border border-line bg-card px-4 py-4 text-base font-medium text-ink"
+      >
+        Review session
+      </button>
+      <SessionFooter sessionId={sessionId} pending={pending} />
     </div>
   );
 }
 
-function SessionReview({
-  sessionId,
-  logs,
-  canFinish,
-  pending,
-  onFinish,
-  onBack,
-  workItems,
-  onJump,
-}: {
-  sessionId: string;
-  logs: SetLog[];
-  canFinish: boolean;
-  pending: boolean;
-  onFinish?: () => void;
-  onBack?: () => void;
-  workItems?: ProgrammeExercise[];
-  onJump?: (item: ProgrammeExercise) => void;
-}) {
-  return (
-    <section className="space-y-4">
-      <div className="rounded-3xl border border-line bg-card p-5">
-        <h2 className="font-display text-3xl text-ink">
-          {canFinish ? "Review this session" : "That is the session"}
-        </h2>
-        <p className="mt-2 text-sm text-muted">
-          {logs.length} working {logs.length === 1 ? "set" : "sets"} logged
-          {canFinish ? ". Add a missed set or mark it complete." : "."}
-        </p>
-        <div className="mt-4">
-          <SessionLogList logs={logs} />
-        </div>
-        {canFinish && workItems && onJump ? (
-          <ExerciseChips
-            items={workItems}
-            logs={logs}
-            selectedId={null}
-            onSelect={onJump}
-          />
-        ) : null}
-        {canFinish && onFinish ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={onFinish}
-            className="mt-6 w-full rounded-2xl bg-ink px-4 py-4 text-base font-medium text-paper"
-          >
-            Mark session complete
-          </button>
-        ) : null}
-        {onBack ? (
-          <button
-            type="button"
-            onClick={onBack}
-            className="mt-3 w-full text-sm text-ink underline decoration-line underline-offset-4"
-          >
-            Back to last lift
-          </button>
-        ) : null}
-      </div>
-      <DeleteSessionButton sessionId={sessionId} />
-    </section>
-  );
+function timedWarmupsFor(
+  items: ProgrammeExercise[],
+  checks: WarmupCheck[],
+): TimedWarmup[] {
+  return items.flatMap((item) => {
+    const check = checks.find((entry) => entry.programmeExerciseId === item.id);
+    if (!check || check.durationSeconds === null) return [];
+    return [
+      {
+        name: item.name,
+        exerciseId: item.exerciseId,
+        durationSeconds: check.durationSeconds,
+      },
+    ];
+  });
 }
 
 function WarmupCard({
+  sessionId,
   item,
   pending,
   onDone,
 }: {
+  sessionId: string;
   item: ProgrammeExercise;
   pending: boolean;
-  onDone: () => void;
+  onDone: (durationSeconds: number | null) => void;
 }) {
+  const timer = useStopwatch(`timer:${sessionId}:${item.id}`);
+
   return (
     <section className="rounded-3xl border border-line bg-card p-5">
-      <ExerciseArt
-        name={item.name}
-        exerciseId={item.exerciseId}
-        size="lg"
-      />
+      <ExerciseArt name={item.name} exerciseId={item.exerciseId} size="lg" />
       <p className="mt-4 text-xs font-medium uppercase tracking-[0.16em] text-muted">
         Warm-up
       </p>
       <h2 className="mt-2 font-display text-3xl text-ink">{item.name}</h2>
       {item.cues ? <p className="mt-3 text-sm leading-6 text-muted">{item.cues}</p> : null}
       {item.notes ? <p className="mt-2 text-sm text-ink">{item.notes}</p> : null}
+
+      {item.tracksDuration ? (
+        <div className="mt-5 space-y-3">
+          <div className="rounded-3xl bg-paper p-4 text-center">
+            <p className="font-mono text-5xl tabular-nums text-ink">
+              {formatClock(timer.seconds)}
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={timer.running ? timer.pause : timer.start}
+                className="rounded-2xl bg-ink px-3 py-3 text-base font-medium text-paper"
+              >
+                {timer.running ? "Pause" : timer.seconds > 0 ? "Resume" : "Start timer"}
+              </button>
+              <button
+                type="button"
+                onClick={timer.reset}
+                disabled={timer.seconds === 0}
+                className="rounded-2xl border border-line px-3 py-3 text-base text-ink disabled:opacity-40"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+          <NumberStepper
+            label="Or set minutes"
+            value={Math.round(timer.seconds / 60)}
+            onChange={(minutes) => timer.set(minutes * 60)}
+            step={1}
+            suffix="min"
+          />
+        </div>
+      ) : null}
+
       <button
         type="button"
         disabled={pending}
-        onClick={onDone}
-        className="mt-6 w-full rounded-2xl bg-ink px-4 py-4 text-base font-medium text-paper"
+        onClick={() => {
+          const seconds = item.tracksDuration && timer.seconds > 0 ? timer.seconds : null;
+          timer.clear();
+          onDone(seconds);
+        }}
+        className="mt-6 w-full rounded-2xl bg-ink px-4 py-4 text-base font-medium text-paper disabled:opacity-60"
       >
-        Done — next
+        {item.tracksDuration && timer.seconds > 0
+          ? `Done — log ${formatClock(timer.seconds)}`
+          : "Done — next"}
       </button>
     </section>
   );
 }
 
-function WorkCard({
-  sessionId,
-  item,
-  side,
-  workItems,
-  logs,
-  history,
-  pending,
-  onSelectExercise,
-  onSelectSide,
-  onLog,
-  onDeleteSet,
-  onNext,
-}: {
-  sessionId: string;
-  item: ProgrammeExercise;
-  side: Side;
-  workItems: ProgrammeExercise[];
-  logs: SetLog[];
-  history: SetLog[];
-  pending: boolean;
-  onSelectExercise: (item: ProgrammeExercise) => void;
-  onSelectSide: (side: Side) => void;
-  onLog: (reps: number, weightKg: number) => void;
-  onDeleteSet: (setLogId: string) => void;
-  onNext: () => void;
-}) {
-  const suggestedWeight =
-    lastWeightForExercise(history, item.exerciseId, side) ??
-    item.targetWeightKg ??
-    0;
-  const suggestedReps =
-    lastRepsForExercise(history, item.exerciseId, side) ??
-    item.targetReps ??
-    8;
-  const [weight, setWeight] = useState(suggestedWeight);
-  const [reps, setReps] = useState(suggestedReps);
+type StopwatchState = { baseSeconds: number; startedAt: number | null };
 
-  const targetSets = targetSetsFor(item);
-  const logged = logsForItem(logs, item.id, side);
-  const allLogged = logsForItem(logs, item.id);
-  const extras = Math.max(0, logged.length - targetSets);
-  const nextLabel = nextWorkItem(workItems, item.id)
-    ? "Next exercise"
-    : "Review session";
-  const lastSession = lastSessionSetsForExercise(
-    history,
-    item.exerciseId,
-    sessionId,
-  );
-  const bilateral = sidesFor(item).length > 1;
-  const sideLabel = side === "none" ? null : side;
+/**
+ * A stopwatch that survives the phone locking or the page reloading: it keeps
+ * the start time, not a tick count, and mirrors itself to localStorage.
+ */
+function useStopwatch(storageKey: string) {
+  const [state, setState] = useState<StopwatchState>({
+    baseSeconds: 0,
+    startedAt: null,
+  });
+  const [loaded, setLoaded] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved) setState(JSON.parse(saved) as StopwatchState);
+    } catch {}
+    setLoaded(true);
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(state));
+    } catch {}
+  }, [loaded, storageKey, state]);
+
+  useEffect(() => {
+    if (state.startedAt === null) return;
+    const id = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [state.startedAt]);
+
+  const seconds =
+    state.baseSeconds +
+    (state.startedAt === null ? 0 : Math.max(0, (now - state.startedAt) / 1000));
+
+  return {
+    seconds: Math.floor(seconds),
+    running: state.startedAt !== null,
+    start: () => {
+      const at = Date.now();
+      setNow(at);
+      setState((prev) => ({ ...prev, startedAt: at }));
+    },
+    pause: () => setState({ baseSeconds: Math.floor(seconds), startedAt: null }),
+    reset: () => setState({ baseSeconds: 0, startedAt: null }),
+    set: (value: number) =>
+      setState({ baseSeconds: Math.max(0, value), startedAt: null }),
+    clear: () => {
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {}
+    },
+  };
+}
+
+function WorkCard({
+  item,
+  current,
+  previous,
+  pending,
+  onSave,
+  onRemove,
+}: {
+  item: ProgrammeExercise;
+  current: ExerciseLog | null;
+  previous: ExerciseLog | null;
+  pending: boolean;
+  onSave: (entry: LogEntry) => void;
+  onRemove: () => void;
+}) {
+  const [entry, setEntry] = useState(() => suggestedEntry(item, current, previous));
+  const bilateral = item.laterality === "bilateral";
   const muscle = muscleFor(item.name, item.exerciseId);
-  const prescription = [
-    muscle,
-    bilateral ? `${targetSets} sets each side, alternating` : `${targetSets} sets`,
-    item.targetReps ? `${item.targetReps} reps` : null,
-    item.targetWeightKg ? `${formatKg(item.targetWeightKg)} kg` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const eyebrow = [muscle, prescriptionFor(item)].filter(Boolean).join(" · ");
 
   return (
     <section className="space-y-4">
-      <ExerciseChips
-        items={workItems}
-        logs={logs}
-        selectedId={item.id}
-        onSelect={onSelectExercise}
-      />
-
       <div className="rounded-3xl border border-line bg-card p-5">
-        <ExerciseArt
-          name={item.name}
-          exerciseId={item.exerciseId}
-          size="lg"
-        />
+        <ExerciseArt name={item.name} exerciseId={item.exerciseId} size="lg" />
         <p className="mt-4 text-xs font-medium uppercase tracking-[0.16em] text-muted">
-          {prescription || "Working set"}
+          {eyebrow}
         </p>
         <h2 className="mt-2 font-display text-3xl text-ink">{item.name}</h2>
         {item.cues ? <p className="mt-3 text-sm leading-6 text-ink">{item.cues}</p> : null}
         {item.notes ? <p className="mt-2 text-sm text-muted">{item.notes}</p> : null}
-        {bilateral ? (
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {sidesFor(item).map((entry) => {
-              const done = setsLoggedFor(logs, item.id, entry);
-              const selected = entry === side;
-              return (
-                <button
-                  key={entry}
-                  type="button"
-                  onClick={() => onSelectSide(entry)}
-                  className={`rounded-2xl px-3 py-3 text-sm font-medium ${
-                    selected
-                      ? "bg-ink text-paper"
-                      : "bg-paper text-ink"
-                  }`}
-                >
-                  {formatSide(entry)} · {done}/{targetSets}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="mt-3 text-sm text-muted">
-            {logged.length}/{targetSets} sets
-            {extras > 0 ? ` · ${extras} extra` : ""}
-          </p>
-        )}
+        <p className="mt-4 text-sm text-muted">
+          Last time:{" "}
+          <span className="font-mono text-ink">
+            {previous ? formatLog(previous) : "not done yet"}
+          </span>
+        </p>
       </div>
 
-      <LastSessionSets logs={lastSession} bilateral={bilateral} />
-
-      <LoggedSets
-        logs={allLogged}
-        showSide={bilateral}
-        pending={pending}
-        onDelete={onDeleteSet}
-      />
+      {current ? (
+        <div className="flex items-center justify-between gap-3 rounded-3xl border border-line bg-card px-4 py-3">
+          <p className="text-sm text-good">
+            ✓ Logged <span className="font-mono">{formatLog(current)}</span>
+          </p>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={onRemove}
+            className="min-h-11 min-w-11 text-sm text-accent"
+          >
+            Remove
+          </button>
+        </div>
+      ) : null}
 
       <NumberStepper
         label="Weight"
-        value={weight}
-        onChange={setWeight}
-        step={weight >= 20 ? 2.5 : 1}
+        value={entry.weightKg}
+        onChange={(weightKg) => setEntry((prev) => ({ ...prev, weightKg }))}
+        step={1}
         suffix="kg"
         decimals
       />
       <NumberStepper
         label="Reps"
-        value={reps}
-        onChange={setReps}
+        value={entry.reps}
+        onChange={(reps) => setEntry((prev) => ({ ...prev, reps }))}
         step={1}
         min={1}
         suffix="reps"
       />
+      <NumberStepper
+        label={bilateral ? "Sets (left + right = 1)" : "Sets"}
+        value={entry.sets}
+        onChange={(sets) => setEntry((prev) => ({ ...prev, sets }))}
+        step={1}
+        min={1}
+        suffix="sets"
+      />
 
       <button
         type="button"
-        disabled={pending || reps < 1}
-        onClick={() => onLog(reps, weight)}
-        className="w-full rounded-3xl bg-accent px-4 py-5 text-lg font-medium text-accent-ink"
+        disabled={pending}
+        onClick={() => onSave(entry)}
+        className="w-full rounded-3xl bg-accent px-4 py-5 text-lg font-medium text-accent-ink disabled:opacity-60"
       >
-        Log {sideLabel ? `${sideLabel} ` : ""}set {logged.length + 1}
-        {logged.length >= targetSets ? " (extra)" : ""}
-      </button>
-
-      <button
-        type="button"
-        onClick={onNext}
-        className="w-full rounded-2xl border border-line bg-card px-4 py-4 text-base font-medium text-ink"
-      >
-        {nextLabel}
+        {current ? "Update" : "Log"} {formatLog(entry)}
       </button>
     </section>
   );
@@ -457,7 +428,7 @@ function ExerciseChips({
   onSelect,
 }: {
   items: ProgrammeExercise[];
-  logs: SetLog[];
+  logs: ExerciseLog[];
   selectedId: string | null;
   onSelect: (item: ProgrammeExercise) => void;
 }) {
@@ -467,9 +438,8 @@ function ExerciseChips({
     <div className="-mx-4 overflow-x-auto px-4">
       <div className="flex gap-2 pb-1">
         {items.map((item) => {
-          const done = isExerciseComplete(item, logs);
+          const done = Boolean(logFor(logs, item));
           const selected = item.id === selectedId;
-          const count = logsForItem(logs, item.id).length;
           return (
             <button
               key={item.id}
@@ -483,14 +453,9 @@ function ExerciseChips({
                     : "border border-line bg-card text-ink"
               }`}
             >
-              <ExerciseArt
-                name={item.name}
-                exerciseId={item.exerciseId}
-                size="chip"
-              />
+              <ExerciseArt name={item.name} exerciseId={item.exerciseId} size="chip" />
               {done ? "✓ " : ""}
               {item.name}
-              {count > 0 ? ` · ${count}` : ""}
             </button>
           );
         })}
@@ -499,85 +464,7 @@ function ExerciseChips({
   );
 }
 
-function LastSessionSets({
-  logs,
-  bilateral,
-}: {
-  logs: SetLog[];
-  bilateral: boolean;
-}) {
-  return (
-    <div className="rounded-3xl border border-line bg-card p-4">
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
-        Last session
-      </p>
-      {logs.length === 0 ? (
-        <p className="mt-3 text-sm text-muted">No previous sets for this lift.</p>
-      ) : (
-        <ul className="mt-3 space-y-1 font-mono text-base text-ink">
-          {logs.map((log, index) => (
-            <li key={log.id}>
-              {index + 1}.{" "}
-              {bilateral
-                ? formatLoggedSet(log)
-                : `${formatKg(log.weightKg)} kg × ${log.reps}`}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function LoggedSets({
-  logs,
-  showSide,
-  pending,
-  onDelete,
-}: {
-  logs: SetLog[];
-  showSide: boolean;
-  pending: boolean;
-  onDelete: (setLogId: string) => void;
-}) {
-  if (logs.length === 0) {
-    return (
-      <p className="px-1 text-sm text-muted">
-        Nothing logged yet. Type the kg and reps you actually did.
-      </p>
-    );
-  }
-
-  return (
-    <div className="rounded-3xl border border-line bg-card p-4">
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
-        This exercise
-      </p>
-      <ul className="mt-3 divide-y divide-line">
-        {logs.map((log, index) => (
-          <li key={log.id} className="flex items-center justify-between gap-3 py-2">
-            <p className="font-mono text-base text-ink">
-              {index + 1}.{" "}
-              {showSide
-                ? formatLoggedSet(log)
-                : `${formatKg(log.weightKg)} kg × ${log.reps}`}
-            </p>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => onDelete(log.id)}
-              className="min-h-11 min-w-11 text-sm text-accent"
-            >
-              Undo
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function EndSessionButton({
+function SessionFooter({
   sessionId,
   pending,
 }: {
@@ -585,14 +472,17 @@ function EndSessionButton({
   pending: boolean;
 }) {
   return (
-    <form action={finishSessionAction.bind(null, sessionId)} className="pt-2">
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full text-sm text-muted underline decoration-line underline-offset-4"
-      >
-        End session early
-      </button>
-    </form>
+    <>
+      <form action={finishSessionAction.bind(null, sessionId)} className="pt-2">
+        <button
+          type="submit"
+          disabled={pending}
+          className="w-full text-sm text-muted underline decoration-line underline-offset-4"
+        >
+          End session early
+        </button>
+      </form>
+      <DeleteSessionButton sessionId={sessionId} label="Delete this session" />
+    </>
   );
 }

@@ -1,5 +1,4 @@
 export type Laterality = "none" | "bilateral";
-export type Side = "left" | "right" | "none";
 
 export type Programme = {
   id: string;
@@ -8,7 +7,6 @@ export type Programme = {
   minHoursBetweenSessions: number;
   targetSessionsPerWeek: number;
   minSessionsPerWeek: number;
-  isActive: boolean;
 };
 
 export type ProgrammeExercise = {
@@ -18,6 +16,7 @@ export type ProgrammeExercise = {
   name: string;
   cues: string | null;
   laterality: Laterality;
+  tracksDuration: boolean;
   isWarmup: boolean;
   sortOrder: number;
   targetSets: number | null;
@@ -34,21 +33,22 @@ export type Session = {
   notes: string | null;
 };
 
-export type SetLog = {
+/** One line per exercise per session: the weight, reps and number of sets. */
+export type ExerciseLog = {
   id: string;
   sessionId: string;
   exerciseId: string;
   programmeExerciseId: string | null;
   exerciseNameSnapshot: string;
-  side: Side;
-  setNumber: number;
-  reps: number;
   weightKg: number;
+  reps: number;
+  sets: number;
   completedAt: string;
 };
 
 export type WarmupCheck = {
   sessionId: string;
   programmeExerciseId: string;
+  durationSeconds: number | null;
   completedAt: string;
 };

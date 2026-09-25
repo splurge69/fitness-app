@@ -1,12 +1,11 @@
 import { supabaseAdmin } from "./supabase";
 import type {
+  ExerciseLog,
   Programme,
   ProgrammeExercise,
   Session,
-  SetLog,
   WarmupCheck,
 } from "./types";
-import { startOfWeek } from "./frequency";
 
 type ProgrammeRow = {
   id: string;
@@ -15,7 +14,6 @@ type ProgrammeRow = {
   min_hours_between_sessions: number;
   target_sessions_per_week: number;
   min_sessions_per_week: number;
-  is_active: boolean;
 };
 
 type ExerciseRow = {
@@ -23,6 +21,7 @@ type ExerciseRow = {
   name: string;
   cues: string | null;
   laterality: "none" | "bilateral";
+  tracks_duration: boolean;
 };
 
 type ProgrammeExerciseRow = {
@@ -35,7 +34,6 @@ type ProgrammeExerciseRow = {
   target_reps: number | null;
   target_weight_kg: number | string | null;
   notes: string | null;
-  exercises: ExerciseRow | ExerciseRow[] | null;
 };
 
 type SessionRow = {
@@ -46,18 +44,32 @@ type SessionRow = {
   notes: string | null;
 };
 
-type SetLogRow = {
+type ExerciseLogRow = {
   id: string;
   session_id: string;
   exercise_id: string;
   programme_exercise_id: string | null;
   exercise_name_snapshot: string;
-  side: "left" | "right" | "none";
-  set_number: number;
-  reps: number;
   weight_kg: number | string;
+  reps: number;
+  sets: number;
   completed_at: string;
 };
+
+type WarmupCheckRow = {
+  session_id: string;
+  programme_exercise_id: string;
+  duration_seconds: number | null;
+  completed_at: string;
+};
+
+const PROGRAMME_COLUMNS =
+  "id, name, notes, min_hours_between_sessions, target_sessions_per_week, min_sessions_per_week";
+const SESSION_COLUMNS = "id, programme_id, started_at, completed_at, notes";
+const EXERCISE_LOG_COLUMNS =
+  "id, session_id, exercise_id, programme_exercise_id, exercise_name_snapshot, weight_kg, reps, sets, completed_at";
+const WARMUP_CHECK_COLUMNS =
+  "session_id, programme_exercise_id, duration_seconds, completed_at";
 
 function mapProgramme(row: ProgrammeRow): Programme {
   return {
@@ -67,7 +79,6 @@ function mapProgramme(row: ProgrammeRow): Programme {
     minHoursBetweenSessions: row.min_hours_between_sessions,
     targetSessionsPerWeek: row.target_sessions_per_week,
     minSessionsPerWeek: row.min_sessions_per_week,
-    isActive: row.is_active,
   };
 }
 
@@ -82,7 +93,7 @@ function throwIfError(error: { message?: string; code?: string; hint?: string } 
 }
 
 function mapProgrammeExercise(
-  row: Omit<ProgrammeExerciseRow, "exercises">,
+  row: ProgrammeExerciseRow,
   exercise: ExerciseRow,
 ): ProgrammeExercise {
   return {
@@ -92,6 +103,7 @@ function mapProgrammeExercise(
     name: exercise.name,
     cues: exercise.cues,
     laterality: exercise.laterality,
+    tracksDuration: exercise.tracks_duration,
     isWarmup: row.is_warmup,
     sortOrder: row.sort_order,
     targetSets: row.target_sets,
@@ -112,32 +124,80 @@ function mapSession(row: SessionRow): Session {
   };
 }
 
-function mapSetLog(row: SetLogRow): SetLog {
+function mapExerciseLog(row: ExerciseLogRow): ExerciseLog {
   return {
     id: row.id,
     sessionId: row.session_id,
     exerciseId: row.exercise_id,
     programmeExerciseId: row.programme_exercise_id,
     exerciseNameSnapshot: row.exercise_name_snapshot,
-    side: row.side,
-    setNumber: row.set_number,
-    reps: row.reps,
     weightKg: Number(row.weight_kg),
+    reps: row.reps,
+    sets: row.sets,
     completedAt: row.completed_at,
   };
 }
 
-export async function getActiveProgramme(): Promise<Programme | null> {
+function mapWarmupCheck(row: WarmupCheckRow): WarmupCheck {
+  return {
+    sessionId: row.session_id,
+    programmeExerciseId: row.programme_exercise_id,
+    durationSeconds: row.duration_seconds,
+    completedAt: row.completed_at,
+  };
+}
+
+export async function getProgrammes(): Promise<Programme[]> {
   const { data, error } = await supabaseAdmin()
     .from("programmes")
-    .select(
-      "id, name, notes, min_hours_between_sessions, target_sessions_per_week, min_sessions_per_week, is_active",
-    )
-    .eq("is_active", true)
+    .select(PROGRAMME_COLUMNS)
+    .order("created_at", { ascending: true });
+
+  throwIfError(error);
+  return ((data ?? []) as ProgrammeRow[]).map(mapProgramme);
+}
+
+export async function getProgramme(programmeId: string): Promise<Programme | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("programmes")
+    .select(PROGRAMME_COLUMNS)
+    .eq("id", programmeId)
     .maybeSingle();
 
   throwIfError(error);
   return data ? mapProgramme(data as ProgrammeRow) : null;
+}
+
+export async function createProgramme(name: string): Promise<Programme> {
+  const { data, error } = await supabaseAdmin()
+    .from("programmes")
+    .insert({ name })
+    .select(PROGRAMME_COLUMNS)
+    .single();
+
+  throwIfError(error);
+  return mapProgramme(data as ProgrammeRow);
+}
+
+export async function updateProgramme(input: {
+  id: string;
+  name: string;
+  notes: string | null;
+  minHoursBetweenSessions: number;
+  targetSessionsPerWeek: number;
+}): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("programmes")
+    .update({
+      name: input.name,
+      notes: input.notes,
+      min_hours_between_sessions: input.minHoursBetweenSessions,
+      target_sessions_per_week: input.targetSessionsPerWeek,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.id);
+
+  throwIfError(error);
 }
 
 export async function getProgrammeItems(
@@ -152,13 +212,13 @@ export async function getProgrammeItems(
     .order("sort_order", { ascending: true });
 
   throwIfError(error);
-  const rows = (data ?? []) as Omit<ProgrammeExerciseRow, "exercises">[];
+  const rows = (data ?? []) as ProgrammeExerciseRow[];
   if (rows.length === 0) return [];
 
   const exerciseIds = [...new Set(rows.map((row) => row.exercise_id))];
   const { data: exercises, error: exerciseError } = await supabaseAdmin()
     .from("exercises")
-    .select("id, name, cues, laterality")
+    .select("id, name, cues, laterality, tracks_duration")
     .in("id", exerciseIds);
 
   throwIfError(exerciseError);
@@ -178,7 +238,7 @@ export async function getProgrammeItems(
 export async function getOpenSession(): Promise<Session | null> {
   const { data, error } = await supabaseAdmin()
     .from("sessions")
-    .select("id, programme_id, started_at, completed_at, notes")
+    .select(SESSION_COLUMNS)
     .is("completed_at", null)
     .order("started_at", { ascending: false })
     .limit(1)
@@ -191,7 +251,7 @@ export async function getOpenSession(): Promise<Session | null> {
 export async function getSession(sessionId: string): Promise<Session | null> {
   const { data, error } = await supabaseAdmin()
     .from("sessions")
-    .select("id, programme_id, started_at, completed_at, notes")
+    .select(SESSION_COLUMNS)
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -199,36 +259,24 @@ export async function getSession(sessionId: string): Promise<Session | null> {
   return data ? mapSession(data as SessionRow) : null;
 }
 
-export async function getLastCompletedSession(): Promise<Session | null> {
+/** Completed sessions, newest first. */
+export async function getCompletedSessions(limit = 60): Promise<Session[]> {
   const { data, error } = await supabaseAdmin()
     .from("sessions")
-    .select("id, programme_id, started_at, completed_at, notes")
+    .select(SESSION_COLUMNS)
     .not("completed_at", "is", null)
     .order("completed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(limit);
 
   throwIfError(error);
-  return data ? mapSession(data as SessionRow) : null;
-}
-
-export async function countSessionsThisWeek(now = new Date()): Promise<number> {
-  const weekStart = startOfWeek(now).toISOString();
-  const { count, error } = await supabaseAdmin()
-    .from("sessions")
-    .select("id", { count: "exact", head: true })
-    .not("completed_at", "is", null)
-    .gte("completed_at", weekStart);
-
-  throwIfError(error);
-  return count ?? 0;
+  return ((data ?? []) as SessionRow[]).map(mapSession);
 }
 
 export async function createSession(programmeId: string): Promise<Session> {
   const { data, error } = await supabaseAdmin()
     .from("sessions")
     .insert({ programme_id: programmeId })
-    .select("id, programme_id, started_at, completed_at, notes")
+    .select(SESSION_COLUMNS)
     .single();
 
   throwIfError(error);
@@ -247,7 +295,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
 export async function getAllSessions(): Promise<Session[]> {
   const { data, error } = await supabaseAdmin()
     .from("sessions")
-    .select("id, programme_id, started_at, completed_at, notes")
+    .select(SESSION_COLUMNS)
     .order("started_at", { ascending: false })
     .limit(200);
 
@@ -264,146 +312,111 @@ export async function completeSession(sessionId: string): Promise<void> {
   throwIfError(error);
 }
 
-export async function getSessionLogs(sessionId: string): Promise<SetLog[]> {
+export async function getExerciseLogsForSessions(
+  sessionIds: string[],
+): Promise<ExerciseLog[]> {
+  if (sessionIds.length === 0) return [];
   const { data, error } = await supabaseAdmin()
-    .from("set_logs")
-    .select(
-      "id, session_id, exercise_id, programme_exercise_id, exercise_name_snapshot, side, set_number, reps, weight_kg, completed_at",
-    )
-    .eq("session_id", sessionId)
+    .from("exercise_logs")
+    .select(EXERCISE_LOG_COLUMNS)
+    .in("session_id", sessionIds)
     .order("completed_at", { ascending: true });
 
   throwIfError(error);
-  return ((data ?? []) as SetLogRow[]).map(mapSetLog);
+  return ((data ?? []) as ExerciseLogRow[]).map(mapExerciseLog);
+}
+
+export async function getSessionLogs(sessionId: string): Promise<ExerciseLog[]> {
+  return getExerciseLogsForSessions([sessionId]);
+}
+
+export async function getWarmupChecksForSessions(
+  sessionIds: string[],
+): Promise<WarmupCheck[]> {
+  if (sessionIds.length === 0) return [];
+  const { data, error } = await supabaseAdmin()
+    .from("warmup_checks")
+    .select(WARMUP_CHECK_COLUMNS)
+    .in("session_id", sessionIds);
+
+  throwIfError(error);
+  return ((data ?? []) as WarmupCheckRow[]).map(mapWarmupCheck);
 }
 
 export async function getWarmupChecks(sessionId: string): Promise<WarmupCheck[]> {
-  const { data, error } = await supabaseAdmin()
-    .from("warmup_checks")
-    .select("session_id, programme_exercise_id, completed_at")
-    .eq("session_id", sessionId);
-
-  throwIfError(error);
-  return ((data ?? []) as Array<{
-    session_id: string;
-    programme_exercise_id: string;
-    completed_at: string;
-  }>).map((row) => ({
-    sessionId: row.session_id,
-    programmeExerciseId: row.programme_exercise_id,
-    completedAt: row.completed_at,
-  }));
+  return getWarmupChecksForSessions([sessionId]);
 }
 
-export async function getRecentSetLogs(limit = 200): Promise<SetLog[]> {
+/** Recent logs for the given exercises, newest first. Used to prefill. */
+export async function getRecentExerciseLogs(
+  exerciseIds: string[],
+  limit = 200,
+): Promise<ExerciseLog[]> {
+  if (exerciseIds.length === 0) return [];
   const { data, error } = await supabaseAdmin()
-    .from("set_logs")
-    .select(
-      "id, session_id, exercise_id, programme_exercise_id, exercise_name_snapshot, side, set_number, reps, weight_kg, completed_at",
-    )
+    .from("exercise_logs")
+    .select(EXERCISE_LOG_COLUMNS)
+    .in("exercise_id", exerciseIds)
     .order("completed_at", { ascending: false })
     .limit(limit);
 
   throwIfError(error);
-  return ((data ?? []) as SetLogRow[]).map(mapSetLog);
+  return ((data ?? []) as ExerciseLogRow[]).map(mapExerciseLog);
 }
 
-export async function deleteSetLog(
-  sessionId: string,
-  setLogId: string,
-): Promise<void> {
-  const { error } = await supabaseAdmin()
-    .from("set_logs")
-    .delete()
-    .eq("id", setLogId)
-    .eq("session_id", sessionId);
-
-  throwIfError(error);
-}
-
-export async function insertSetLog(input: {
+export async function saveExerciseLog(input: {
   sessionId: string;
   exerciseId: string;
   programmeExerciseId: string;
   exerciseName: string;
-  side: SetLog["side"];
-  setNumber: number;
-  reps: number;
   weightKg: number;
-}): Promise<SetLog> {
-  const { data, error } = await supabaseAdmin()
-    .from("set_logs")
-    .insert({
-      session_id: input.sessionId,
-      exercise_id: input.exerciseId,
-      programme_exercise_id: input.programmeExerciseId,
-      exercise_name_snapshot: input.exerciseName,
-      side: input.side,
-      set_number: input.setNumber,
-      reps: input.reps,
-      weight_kg: input.weightKg,
-    })
-    .select(
-      "id, session_id, exercise_id, programme_exercise_id, exercise_name_snapshot, side, set_number, reps, weight_kg, completed_at",
-    )
-    .single();
+  reps: number;
+  sets: number;
+}): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("exercise_logs")
+    .upsert(
+      {
+        session_id: input.sessionId,
+        exercise_id: input.exerciseId,
+        programme_exercise_id: input.programmeExerciseId,
+        exercise_name_snapshot: input.exerciseName,
+        weight_kg: input.weightKg,
+        reps: input.reps,
+        sets: input.sets,
+        completed_at: new Date().toISOString(),
+      },
+      { onConflict: "session_id,exercise_id" },
+    );
 
   throwIfError(error);
-  return mapSetLog(data as SetLogRow);
+}
+
+export async function deleteExerciseLog(
+  sessionId: string,
+  exerciseId: string,
+): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("exercise_logs")
+    .delete()
+    .eq("session_id", sessionId)
+    .eq("exercise_id", exerciseId);
+
+  throwIfError(error);
 }
 
 export async function insertWarmupCheck(
   sessionId: string,
   programmeExerciseId: string,
+  durationSeconds: number | null,
 ): Promise<void> {
   const { error } = await supabaseAdmin().from("warmup_checks").upsert({
     session_id: sessionId,
     programme_exercise_id: programmeExerciseId,
+    duration_seconds: durationSeconds,
   });
 
   throwIfError(error);
-}
-
-export async function getCompletedSessions(): Promise<
-  Array<Session & { setCount: number }>
-> {
-  const { data, error } = await supabaseAdmin()
-    .from("sessions")
-    .select("id, programme_id, started_at, completed_at, notes")
-    .not("completed_at", "is", null)
-    .order("completed_at", { ascending: false })
-    .limit(40);
-
-  throwIfError(error);
-  const sessions = ((data ?? []) as SessionRow[]).map(mapSession);
-  const ids = sessions.map((session) => session.id);
-  if (ids.length === 0) return [];
-
-  const { data: logs, error: logError } = await supabaseAdmin()
-    .from("set_logs")
-    .select("session_id")
-    .in("session_id", ids);
-
-  throwIfError(logError);
-  const counts = new Map<string, number>();
-  for (const row of (logs ?? []) as Array<{ session_id: string }>) {
-    counts.set(row.session_id, (counts.get(row.session_id) ?? 0) + 1);
-  }
-
-  return sessions.map((session) => ({
-    ...session,
-    setCount: counts.get(session.id) ?? 0,
-  }));
-}
-
-export async function getSessionHistory(sessionId: string): Promise<{
-  session: Session;
-  logs: SetLog[];
-} | null> {
-  const session = await getSession(sessionId);
-  if (!session) return null;
-  const logs = await getSessionLogs(sessionId);
-  return { session, logs };
 }
 
 export async function updateProgrammeExercise(input: {
@@ -433,6 +446,7 @@ export async function updateExercise(input: {
   name: string;
   cues: string | null;
   laterality: "none" | "bilateral";
+  tracksDuration: boolean;
 }): Promise<void> {
   const { error } = await supabaseAdmin()
     .from("exercises")
@@ -440,6 +454,7 @@ export async function updateExercise(input: {
       name: input.name,
       cues: input.cues,
       laterality: input.laterality,
+      tracks_duration: input.tracksDuration,
       updated_at: new Date().toISOString(),
     })
     .eq("id", input.id);
@@ -452,6 +467,7 @@ export async function addProgrammeExercise(input: {
   name: string;
   cues: string | null;
   laterality: "none" | "bilateral";
+  tracksDuration: boolean;
   isWarmup: boolean;
   targetSets: number | null;
   targetReps: number | null;
@@ -475,6 +491,7 @@ export async function addProgrammeExercise(input: {
       name: input.name,
       cues: input.cues,
       laterality: input.laterality,
+      tracks_duration: input.tracksDuration,
     })
     .select("id")
     .single();

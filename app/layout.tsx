@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ACL tracker",
-  description: "Personal ACL rehab session tracker",
+  description: "Personal training and ACL rehab tracker",
   appleWebApp: {
     capable: true,
     title: "ACL tracker",

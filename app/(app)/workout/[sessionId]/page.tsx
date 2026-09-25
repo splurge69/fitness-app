@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import {
+  getProgramme,
   getProgrammeItems,
-  getRecentSetLogs,
+  getRecentExerciseLogs,
   getSession,
   getSessionLogs,
   getWarmupChecks,
@@ -18,15 +19,18 @@ export default async function WorkoutPage({
   const session = await getSession(sessionId);
   if (!session) notFound();
 
-  const [items, logs, checks, history] = await Promise.all([
+  const [programme, items, logs, checks] = await Promise.all([
+    getProgramme(session.programmeId),
     getProgrammeItems(session.programmeId),
     getSessionLogs(session.id),
     getWarmupChecks(session.id),
-    getRecentSetLogs(),
   ]);
+  const history = await getRecentExerciseLogs(
+    items.filter((item) => !item.isWarmup).map((item) => item.exerciseId),
+  );
 
   return (
-    <Shell title={session.completedAt ? "Session done" : "Session"}>
+    <Shell title={programme?.name ?? "Session"}>
       <WorkoutClient
         sessionId={session.id}
         completed={Boolean(session.completedAt)}
