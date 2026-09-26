@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { SubmitButton } from "@/components/submit-button";
 import { resumeWorkoutAction, startWorkoutAction } from "@/lib/actions/sessions";
@@ -51,9 +52,15 @@ export default async function HomePage() {
 
   return (
     <Shell>
-      <section className="rounded-3xl border border-line bg-card p-5">
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">
+      <Link
+        href="/history"
+        className="block rounded-3xl border border-line bg-card p-5 active:border-accent"
+      >
+        <p className="flex items-center justify-between text-xs font-medium uppercase tracking-[0.16em] text-muted">
           This week
+          <span className="text-xl text-ink" aria-hidden>
+            ›
+          </span>
         </p>
         <p className="mt-2 font-display text-3xl text-ink">
           {thisWeek.length} {thisWeek.length === 1 ? "session" : "sessions"}
@@ -66,7 +73,7 @@ export default async function HomePage() {
               ).toLowerCase()}`
             : "none yet"}
         </p>
-      </section>
+      </Link>
 
       {openSession ? (
         <form action={resumeWorkoutAction} className="mt-5">
