@@ -1,14 +1,19 @@
 @import "tailwindcss";
 
+/* Club Serginho: an 80s gym after dark. Neon on midnight purple, chrome
+   headlines, LCD numbers, sharp corners. */
 :root {
-  --paper: #f3ece0;
-  --ink: #1f1914;
-  --muted: #6b5e52;
-  --card: #fffaf1;
-  --line: #d9cfc0;
-  --accent: #b45309;
-  --accent-ink: #fff7ed;
-  --good: #3f6212;
+  --paper: #12081f;
+  --card: #1e0f35;
+  --tile: #190b2c;
+  --ink: #fbf4ff;
+  --muted: #b7a2d6;
+  --line: #4b2f73;
+  --accent: #ff2e93;
+  --accent-ink: #19041f;
+  --electric: #26e7ff;
+  --sun: #ffcc33;
+  --good: #3dffa6;
 }
 
 @theme inline {
@@ -19,25 +24,82 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
+  --color-electric: var(--electric);
+  --color-sun: var(--sun);
   --color-good: var(--good);
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
-  --font-display: ui-serif, Georgia, "Times New Roman", serif;
-  --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans: "Barlow Semi Condensed", "Avenir Next Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-display: "Racing Sans One", "Futura", "Avenir Next Condensed", Impact, sans-serif;
+  --font-mono: "VT323", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* Chunky, squared-off panels instead of soft pills. */
+  --radius-xl: 0.25rem;
+  --radius-2xl: 0.375rem;
+  --radius-3xl: 0.5rem;
 }
 
 html {
   background: var(--paper);
+  color-scheme: dark;
 }
 
 body {
+  /* Pink glow at the top, a neon floor grid receding to the horizon below. */
   background:
-    radial-gradient(circle at top, rgba(180, 83, 9, 0.08), transparent 36%),
-    var(--paper);
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20400%20200%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M200%200%20L-600%20200%20M200%200%20L-520%20200%20M200%200%20L-440%20200%20M200%200%20L-360%20200%20M200%200%20L-280%20200%20M200%200%20L-200%20200%20M200%200%20L-120%20200%20M200%200%20L-40%20200%20M200%200%20L40%20200%20M200%200%20L120%20200%20M200%200%20L200%20200%20M200%200%20L280%20200%20M200%200%20L360%20200%20M200%200%20L440%20200%20M200%200%20L520%20200%20M200%200%20L600%20200%20M200%200%20L680%20200%20M200%200%20L760%20200%20M200%200%20L840%20200%20M200%200%20L920%20200%20M200%200%20L1000%20200%20M0%206%20H400%20M0%2014%20H400%20M0%2025%20H400%20M0%2040%20H400%20M0%2060%20H400%20M0%2086%20H400%20M0%20120%20H400%20M0%20160%20H400%20M0%20200%20H400%22%20stroke%3D%22%23ff2e93%22%20stroke-opacity%3D%220.45%22%20stroke-width%3D%221%22%20fill%3D%22none%22%20vector-effect%3D%22non-scaling-stroke%22/%3E%3C/svg%3E") bottom / 100% 34vh no-repeat,
+    radial-gradient(ellipse 120% 60% at 50% 0%, rgba(255, 46, 147, 0.22), transparent 60%),
+    linear-gradient(180deg, #1a0a33 0%, var(--paper) 55%);
+  background-attachment: fixed;
   color: var(--ink);
-  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
   min-height: 100vh;
 }
 
 .font-display {
-  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+/* LCD digits read small, so size them up to sit with the body text. */
+.font-mono {
+  font-size-adjust: 0.62;
+  letter-spacing: 0.02em;
+}
+
+/* Chrome lettering for big headlines. */
+.chrome {
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #d9e4ff 38%,
+    #6a5a9e 50%,
+    #ffb3de 58%,
+    #ffffff 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 var(--accent)) drop-shadow(0 0 14px rgba(255, 46, 147, 0.45));
+}
+
+/* Sunset stripes under the wordmark. */
+.stripes {
+  display: block;
+  height: 10px;
+  width: 7rem;
+  background: linear-gradient(
+    180deg,
+    var(--sun) 0 22%,
+    transparent 22% 39%,
+    #ff8a3d 39% 61%,
+    transparent 61% 78%,
+    var(--accent) 78% 100%
+  );
+  transform: skewX(-20deg);
+}
+
+/* Neon glow on the main action buttons. */
+.bg-accent {
+  box-shadow: 0 0 22px rgba(255, 46, 147, 0.45);
+}
+.bg-electric {
+  box-shadow: 0 0 22px rgba(38, 231, 255, 0.35);
 }

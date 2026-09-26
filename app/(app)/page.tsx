@@ -72,7 +72,7 @@ export default async function HomePage() {
         <form action={resumeWorkoutAction} className="mt-5">
           <SubmitButton
             pendingLabel="Opening…"
-            className="w-full rounded-3xl bg-ink px-4 py-5 text-left text-paper"
+            className="w-full rounded-3xl bg-electric px-4 py-5 text-left text-accent-ink"
           >
             <span className="block text-lg font-medium">Resume session</span>
             <span className="mt-1 block text-sm opacity-80">

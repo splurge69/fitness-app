@@ -5,6 +5,13 @@ const MUSCLES: Partial<Record<ExerciseArtKey, string>> = {
   "leg-extension": "Quads",
   "leg-curl": "Hamstrings",
   "calf-raise": "Calves",
+  "bench-press": "Chest",
+  "lat-pulldown": "Lats",
+  deadlift: "Hamstrings",
+  "leg-press": "Quads",
+  "cable-row": "Upper back",
+  "shoulder-press": "Shoulders",
+  "pallof-press": "Core",
 };
 
 export function muscleFor(

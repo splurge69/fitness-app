@@ -83,7 +83,7 @@ export function HistoryCalendar({
                 "flex min-h-12 flex-col items-center justify-center rounded-2xl text-sm",
                 day.inMonth ? "text-ink" : "text-muted/50",
                 day.isToday ? "ring-1 ring-ink" : "",
-                selected ? "bg-ink text-paper" : "",
+                selected ? "bg-electric text-accent-ink" : "",
                 !selected && done ? "bg-accent/15" : "",
                 !selected && !done && open ? "bg-paper" : "",
               ].join(" ")}

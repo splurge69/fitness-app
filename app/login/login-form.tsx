@@ -22,9 +22,9 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-2xl bg-ink px-4 py-4 text-base font-medium text-paper disabled:opacity-60"
+        className="w-full rounded-2xl bg-electric px-4 py-4 font-display text-xl uppercase tracking-[0.1em] text-accent-ink disabled:opacity-60"
       >
-        {pending ? "Checking…" : "Open the log"}
+        {pending ? "Checking…" : "Let’s go"}
       </button>
     </form>
   );

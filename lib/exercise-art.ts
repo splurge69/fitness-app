@@ -6,6 +6,14 @@ export const EXERCISE_ART_KEYS = [
   "leg-extension",
   "leg-curl",
   "calf-raise",
+  "band-pull-apart",
+  "bench-press",
+  "lat-pulldown",
+  "deadlift",
+  "leg-press",
+  "cable-row",
+  "shoulder-press",
+  "pallof-press",
   "fallback",
 ] as const;
 
@@ -19,16 +27,33 @@ const SEEDED_IDS: Record<string, ExerciseArtKey> = {
   "21111111-1111-4111-8111-111111111115": "leg-extension",
   "21111111-1111-4111-8111-111111111116": "leg-curl",
   "21111111-1111-4111-8111-111111111117": "calf-raise",
+  "22222222-2222-4222-8222-222222222201": "band-pull-apart",
+  "22222222-2222-4222-8222-222222222202": "bench-press",
+  "22222222-2222-4222-8222-222222222203": "lat-pulldown",
+  "22222222-2222-4222-8222-222222222204": "deadlift",
+  "22222222-2222-4222-8222-222222222205": "leg-press",
+  "22222222-2222-4222-8222-222222222206": "cable-row",
+  "22222222-2222-4222-8222-222222222207": "shoulder-press",
+  "22222222-2222-4222-8222-222222222208": "pallof-press",
 };
 
+// Most specific first: "leg press" before "press", "leg curl" before "curl".
 const RULES: Array<{ key: ExerciseArtKey; match: RegExp }> = [
   { key: "split-squat", match: /bulgarian|split\s*squat/ },
+  { key: "leg-press", match: /leg\s*press/ },
   { key: "leg-extension", match: /extension/ },
-  { key: "leg-curl", match: /curl|hamstring/ },
+  { key: "leg-curl", match: /leg\s*curl|hamstring\s*curl/ },
   { key: "calf-raise", match: /calf/ },
+  { key: "pallof-press", match: /pallof|anti.?rotation/ },
+  { key: "band-pull-apart", match: /pull.?apart|face\s*pull/ },
+  { key: "lat-pulldown", match: /pull.?down|pull.?up|chin.?up|\blat\b/ },
+  { key: "bench-press", match: /bench|chest\s*press|push.?up|\bfly\b/ },
+  { key: "shoulder-press", match: /shoulder|overhead|military|arnold/ },
+  { key: "deadlift", match: /deadlift|\brdl\b|hinge|good\s*morning|hip\s*thrust/ },
+  { key: "cable-row", match: /\brow\b|\browing\b/ },
   { key: "assault-bike", match: /bike|cycle|spin/ },
   { key: "ball-lunges", match: /lunge|exercise\s*ball|\bball\b/ },
-  { key: "movement-prep", match: /movement|cat.?cow|prepar|mobility|decelerat/ },
+  { key: "movement-prep", match: /movement|cat.?cow|prepar|mobility|decelerat|stretch/ },
   { key: "split-squat", match: /\bsquat\b/ },
 ];
 

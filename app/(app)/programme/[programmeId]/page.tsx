@@ -80,7 +80,7 @@ export default async function ProgrammePage({
         </div>
         <SubmitButton
           pendingLabel="Saving…"
-          className="w-full rounded-2xl bg-ink px-3 py-3 text-sm font-medium text-paper"
+          className="w-full rounded-2xl bg-electric px-3 py-3 text-sm font-medium text-accent-ink"
         >
           Save programme
         </SubmitButton>

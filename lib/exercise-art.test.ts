@@ -20,6 +20,17 @@ describe("artKeyFor", () => {
     expect(artKeyFor("Calf raise")).toBe("calf-raise");
   });
 
+  it("matches the general fitness lifts by name", () => {
+    expect(artKeyFor("Band pull-aparts")).toBe("band-pull-apart");
+    expect(artKeyFor("Dumbbell bench press")).toBe("bench-press");
+    expect(artKeyFor("Lat pulldown")).toBe("lat-pulldown");
+    expect(artKeyFor("Romanian deadlift")).toBe("deadlift");
+    expect(artKeyFor("Leg press")).toBe("leg-press");
+    expect(artKeyFor("Seated cable row")).toBe("cable-row");
+    expect(artKeyFor("Dumbbell shoulder press")).toBe("shoulder-press");
+    expect(artKeyFor("Pallof press")).toBe("pallof-press");
+  });
+
   it("falls back for an unknown lift", () => {
     expect(artKeyFor("Farmers carry")).toBe("fallback");
     expect(artKeyFor("")).toBe("fallback");

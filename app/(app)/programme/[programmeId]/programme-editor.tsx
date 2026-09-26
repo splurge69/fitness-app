@@ -122,7 +122,7 @@ export function ProgrammeEditor({
             </div>
             <button
               type="submit"
-              className="w-full rounded-2xl bg-ink px-3 py-3 text-sm font-medium text-paper"
+              className="w-full rounded-2xl bg-electric px-3 py-3 text-sm font-medium text-accent-ink"
             >
               Save
             </button>

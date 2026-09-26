@@ -157,7 +157,7 @@ export function WorkoutClient({
             type="button"
             disabled={finishing}
             onClick={() => startFinishing(() => finishSessionAction(sessionId))}
-            className="mt-6 w-full rounded-2xl bg-ink px-4 py-4 text-base font-medium text-paper disabled:opacity-60"
+            className="mt-6 w-full rounded-2xl bg-electric px-4 py-4 text-base font-medium text-accent-ink disabled:opacity-60"
           >
             {finishing ? "Finishing…" : "Mark session complete"}
           </button>
@@ -275,7 +275,7 @@ function WarmupCard({
               <button
                 type="button"
                 onClick={timer.running ? timer.pause : timer.start}
-                className="rounded-2xl bg-ink px-3 py-3 text-base font-medium text-paper"
+                className="rounded-2xl bg-electric px-3 py-3 text-base font-medium text-accent-ink"
               >
                 {timer.running ? "Pause" : timer.seconds > 0 ? "Resume" : "Start timer"}
               </button>
@@ -306,7 +306,7 @@ function WarmupCard({
           timer.clear();
           onDone(seconds);
         }}
-        className="mt-6 w-full rounded-2xl bg-ink px-4 py-4 text-base font-medium text-paper disabled:opacity-60"
+        className="mt-6 w-full rounded-2xl bg-electric px-4 py-4 text-base font-medium text-accent-ink disabled:opacity-60"
       >
         {item.tracksDuration && timer.seconds > 0
           ? `Done — log ${formatClock(timer.seconds)}`
@@ -507,7 +507,7 @@ function ExerciseChips({
               onClick={() => onSelect(item)}
               className={`flex shrink-0 items-center gap-2 rounded-full py-1.5 pr-3 pl-1.5 text-sm ${
                 selected
-                  ? "bg-ink text-paper"
+                  ? "bg-electric text-accent-ink"
                   : done
                     ? "bg-card text-good"
                     : "border border-line bg-card text-ink"

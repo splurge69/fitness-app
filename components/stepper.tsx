@@ -77,7 +77,7 @@ export function NumberStepper({
         <button
           type="button"
           onClick={() => commit(value + step)}
-          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-ink text-3xl text-paper"
+          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-electric text-3xl text-accent-ink"
           aria-label={`Increase ${label}`}
         >
           +
