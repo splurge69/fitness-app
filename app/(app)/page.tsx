@@ -7,6 +7,7 @@ import { formatHoursSince, startOfWeek } from "@/lib/frequency";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { describeSupabaseError } from "@/lib/supabase-error";
 import type { Programme, Session } from "@/lib/types";
+import { upNextProgrammeId } from "@/lib/workout";
 
 export default async function HomePage() {
   if (!isSupabaseConfigured()) {
@@ -42,6 +43,10 @@ export default async function HomePage() {
     (session) => new Date(session.completedAt!).getTime() >= weekStart,
   );
   const last = completed[0] ?? null;
+  const upNext = upNextProgrammeId(
+    programmes.map((programme) => programme.id),
+    completed,
+  );
   const nameOf = (id: string) =>
     programmes.find((programme) => programme.id === id)?.name ?? "Session";
 
@@ -101,6 +106,7 @@ export default async function HomePage() {
                     completed={completed}
                     thisWeek={thisWeek}
                     now={now}
+                    upNext={programme.id === upNext}
                   />
                 </li>
               ))}
@@ -117,11 +123,13 @@ function StartButton({
   completed,
   thisWeek,
   now,
+  upNext,
 }: {
   programme: Programme;
   completed: Session[];
   thisWeek: Session[];
   now: Date;
+  upNext: boolean;
 }) {
   const last = completed.find((session) => session.programmeId === programme.id);
   const doneThisWeek = thisWeek.filter(
@@ -135,10 +143,19 @@ function StartButton({
     <form action={startWorkoutAction.bind(null, programme.id)}>
       <SubmitButton
         pendingLabel="Starting…"
-        className="w-full rounded-3xl border border-line bg-card px-5 py-4 text-left"
+        className={`w-full rounded-3xl border bg-card px-5 py-4 text-left ${
+          upNext ? "border-accent" : "border-line"
+        }`}
       >
         <span className="flex items-center justify-between gap-3">
-          <span className="text-lg font-medium text-ink">{programme.name}</span>
+          <span className="flex items-center gap-2">
+            <span className="text-lg font-medium text-ink">{programme.name}</span>
+            {upNext ? (
+              <span className="rounded-sm bg-accent px-1.5 py-0.5 font-display text-xs uppercase tracking-[0.1em] text-accent-ink">
+                Up next
+              </span>
+            ) : null}
+          </span>
           <span className="text-2xl text-ink" aria-hidden>
             ›
           </span>

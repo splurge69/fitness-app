@@ -7,6 +7,7 @@ import {
   completeSession,
   createSession,
   deleteExerciseLog,
+  deleteWarmupCheck,
   deleteSession,
   getOpenSession,
   getProgramme,
@@ -81,6 +82,16 @@ export async function checkWarmupAction(
   const duration =
     durationSeconds === null ? null : wholeNumber(durationSeconds, 0);
   await insertWarmupCheck(sessionId, programmeExerciseId, duration);
+  revalidatePath(`/workout/${sessionId}`);
+}
+
+/** Undo a ticked warm-up or a logged time. */
+export async function uncheckAction(
+  sessionId: string,
+  programmeExerciseId: string,
+): Promise<void> {
+  await requireSession();
+  await deleteWarmupCheck(sessionId, programmeExerciseId);
   revalidatePath(`/workout/${sessionId}`);
 }
 

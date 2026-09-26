@@ -31,8 +31,19 @@ describe("artKeyFor", () => {
     expect(artKeyFor("Pallof press")).toBe("pallof-press");
   });
 
+  it("matches the rotation programme exercises by name", () => {
+    expect(artKeyFor("Incline treadmill walk")).toBe("treadmill");
+    expect(artKeyFor("Cross-trainer")).toBe("cross-trainer");
+    expect(artKeyFor("Hip thrust")).toBe("hip-thrust");
+    expect(artKeyFor("Incline push-up")).toBe("push-up");
+    expect(artKeyFor("Farmer carry")).toBe("carry");
+    expect(artKeyFor("Suitcase carry")).toBe("carry");
+    expect(artKeyFor("Dead bug")).toBe("dead-bug");
+    expect(artKeyFor("Bird dog")).toBe("bird-dog");
+  });
+
   it("falls back for an unknown lift", () => {
-    expect(artKeyFor("Farmers carry")).toBe("fallback");
+    expect(artKeyFor("Turkish get-up")).toBe("fallback");
     expect(artKeyFor("")).toBe("fallback");
   });
 });

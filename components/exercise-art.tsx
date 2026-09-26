@@ -289,6 +289,91 @@ function PallofPress({ label }: { label: string }) {
   );
 }
 
+function Treadmill({ label }: { label: string }) {
+  return (
+    <Plate label={label}>
+      <path d="M18 74 V80 M76 67 V80 M74 67 L78 34 M70 32 H84" {...kit} />
+      <path d="M14 75 L80 67" {...load} />
+      <Head cx={44} cy={20} />
+      <path
+        d="M44 25 L46 46 M46 46 L38 70 M46 46 L56 67 M44 31 L36 42 M44 31 L54 40"
+        {...figure}
+      />
+    </Plate>
+  );
+}
+
+function CrossTrainer({ label }: { label: string }) {
+  return (
+    <Plate label={label}>
+      <path d="M64 76 L70 28 M62 22 L68 62" {...kit} />
+      <ellipse cx="46" cy="70" rx="16" ry="5" {...load} strokeWidth={2.4} />
+      <Head cx={44} cy={16} />
+      <path
+        d="M44 21 V44 M44 44 L36 68 M44 44 L56 66 M44 28 L56 32 L62 24"
+        {...figure}
+      />
+    </Plate>
+  );
+}
+
+function Carry({ label }: { label: string }) {
+  return (
+    <Plate label={label}>
+      <Head cx={48} cy={16} />
+      <path d="M48 21 V48 M48 48 L42 80 M48 48 L55 80 M48 28 L36 52 M48 28 L60 52" {...figure} />
+      <circle cx={35} cy={60} r={6} {...load} />
+      <circle cx={61} cy={60} r={6} {...load} />
+      <path d="M35 54 V52 M61 54 V52" {...load} />
+    </Plate>
+  );
+}
+
+function DeadBug({ label }: { label: string }) {
+  return (
+    <Plate label={label}>
+      <path d="M10 74 H86" {...kit} />
+      <Head cx={16} cy={66} />
+      <path d="M21 68 L50 68 M28 68 L30 46 M50 68 L56 50 L68 50" {...figure} />
+      <path d="M28 68 L14 50 M50 68 L82 64" {...load} />
+    </Plate>
+  );
+}
+
+function BirdDog({ label }: { label: string }) {
+  return (
+    <Plate label={label}>
+      <path d="M10 76 H86" {...kit} />
+      <Head cx={27} cy={42} />
+      <path d="M34 50 L60 50 M36 50 L36 74 M60 50 L60 74 L74 74" {...figure} />
+      <path d="M34 52 L12 54 M60 50 L86 44" {...load} />
+    </Plate>
+  );
+}
+
+function PushUp({ label }: { label: string }) {
+  return (
+    <Plate label={label}>
+      <path d="M12 52 H36 M16 52 V80 M32 52 V80" {...kit} />
+      <Head cx={24} cy={34} />
+      <path d="M30 40 L62 62 L84 78" {...figure} />
+      <path d="M31 41 L28 52" {...load} />
+    </Plate>
+  );
+}
+
+function HipThrust({ label }: { label: string }) {
+  return (
+    <Plate label={label}>
+      <path d="M12 56 H34 M16 56 V80 M30 56 V80" {...kit} />
+      <Head cx={22} cy={46} />
+      <path d="M28 52 L54 50 M54 50 L66 58 L68 80" {...figure} />
+      <circle cx={50} cy={42} r={7} {...load} />
+      <path d="M38 46 H62" {...load} />
+    </Plate>
+  );
+}
+
 function Fallback({ label }: { label: string }) {
   return (
     <Plate label={label}>
@@ -316,5 +401,12 @@ const marks: Record<ExerciseArtKey, (props: { label: string }) => ReactNode> = {
   "cable-row": CableRow,
   "shoulder-press": ShoulderPress,
   "pallof-press": PallofPress,
+  treadmill: Treadmill,
+  "cross-trainer": CrossTrainer,
+  carry: Carry,
+  "dead-bug": DeadBug,
+  "bird-dog": BirdDog,
+  "push-up": PushUp,
+  "hip-thrust": HipThrust,
   fallback: Fallback,
 };

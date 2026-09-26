@@ -9,6 +9,7 @@ import {
   lastLogForExercise,
   nextWorkItem,
   suggestedEntry,
+  upNextProgrammeId,
 } from "./workout";
 
 function item(
@@ -72,14 +73,40 @@ describe("getWorkoutStep", () => {
 
 describe("nextWorkItem", () => {
   it("skips lifts already logged and wraps round", () => {
-    expect(nextWorkItem(items, [], "e1")?.id).toBe("e2");
-    expect(nextWorkItem(items, [{ exerciseId: "ex-e2" }], "e1")?.id).toBe("e3");
-    expect(nextWorkItem(items, [{ exerciseId: "ex-e1" }], "e3")?.id).toBe("e2");
+    expect(nextWorkItem(items, [], [], "e1")?.id).toBe("e2");
+    expect(nextWorkItem(items, [{ exerciseId: "ex-e2" }], [], "e1")?.id).toBe("e3");
+    expect(nextWorkItem(items, [{ exerciseId: "ex-e1" }], [], "e3")?.id).toBe("e2");
   });
 
   it("returns null when everything else is logged", () => {
     const logs = [{ exerciseId: "ex-e2" }, { exerciseId: "ex-e3" }];
-    expect(nextWorkItem(items, logs, "e1")).toBeNull();
+    expect(nextWorkItem(items, logs, [], "e1")).toBeNull();
+  });
+});
+
+describe("timed work items", () => {
+  const walk = item({ id: "t1", name: "Incline walk", sortOrder: 50, tracksDuration: true });
+  const withWalk = [...items, walk];
+  const warmedUp = [{ programmeExerciseId: "w1" }];
+  const lifted = [{ exerciseId: "ex-e1" }, { exerciseId: "ex-e2" }, { exerciseId: "ex-e3" }];
+
+  it("stays open until a time is logged, not a weight", () => {
+    expect(getWorkoutStep(withWalk, lifted, warmedUp)).toEqual({ kind: "work", item: walk });
+    expect(
+      getWorkoutStep(withWalk, lifted, [...warmedUp, { programmeExerciseId: "t1" }]),
+    ).toEqual({ kind: "complete" });
+  });
+});
+
+describe("upNextProgrammeId", () => {
+  it("picks the programme done least recently, never-done first", () => {
+    const completed = [
+      { programmeId: "acl", completedAt: "2026-09-25T10:00:00Z" },
+      { programmeId: "tone", completedAt: "2026-09-23T10:00:00Z" },
+    ];
+    expect(upNextProgrammeId(["acl", "tone", "cardio"], completed)).toBe("cardio");
+    expect(upNextProgrammeId(["acl", "tone"], completed)).toBe("tone");
+    expect(upNextProgrammeId(["acl"], completed)).toBeNull();
   });
 });
 

@@ -140,11 +140,16 @@ function mapWarmupCheck(row: WarmupCheckRow): WarmupCheck {
   };
 }
 
-export async function getProgrammes(): Promise<Programme[]> {
-  const { data, error } = await supabaseAdmin()
+/** Current programmes. Pass `includeArchived` to name old sessions in History. */
+export async function getProgrammes(
+  { includeArchived = false }: { includeArchived?: boolean } = {},
+): Promise<Programme[]> {
+  let query = supabaseAdmin()
     .from("programmes")
     .select(PROGRAMME_COLUMNS)
     .order("created_at", { ascending: true });
+  if (!includeArchived) query = query.is("archived_at", null);
+  const { data, error } = await query;
 
   throwIfError(error);
   return ((data ?? []) as ProgrammeRow[]).map(mapProgramme);
@@ -375,6 +380,19 @@ export async function deleteExerciseLog(
     .delete()
     .eq("session_id", sessionId)
     .eq("exercise_id", exerciseId);
+
+  throwIfError(error);
+}
+
+export async function deleteWarmupCheck(
+  sessionId: string,
+  programmeExerciseId: string,
+): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("warmup_checks")
+    .delete()
+    .eq("session_id", sessionId)
+    .eq("programme_exercise_id", programmeExerciseId);
 
   throwIfError(error);
 }

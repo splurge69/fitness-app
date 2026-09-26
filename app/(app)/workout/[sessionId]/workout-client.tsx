@@ -21,13 +21,16 @@ import {
   deleteExerciseLogAction,
   finishSessionAction,
   saveExerciseLogAction,
+  uncheckAction,
 } from "@/lib/actions/sessions";
 import type { ExerciseLog, ProgrammeExercise, WarmupCheck } from "@/lib/types";
 import { muscleFor } from "@/lib/muscles";
 import {
   formatClock,
+  formatDuration,
   formatLog,
   getWorkoutStep,
+  isItemDone,
   lastLogForExercise,
   logFor,
   nextWorkItem,
@@ -40,6 +43,17 @@ import {
 type LogChange =
   | { kind: "save"; log: ExerciseLog }
   | { kind: "remove"; exerciseId: string };
+
+type CheckChange =
+  | { kind: "save"; check: WarmupCheck }
+  | { kind: "remove"; programmeExerciseId: string };
+
+function applyCheckChange(checks: WarmupCheck[], change: CheckChange): WarmupCheck[] {
+  const id =
+    change.kind === "save" ? change.check.programmeExerciseId : change.programmeExerciseId;
+  const rest = checks.filter((check) => check.programmeExerciseId !== id);
+  return change.kind === "save" ? [...rest, change.check] : rest;
+}
 
 function applyLogChange(logs: ExerciseLog[], change: LogChange): ExerciseLog[] {
   const exerciseId = change.kind === "save" ? change.log.exerciseId : change.exerciseId;
@@ -66,10 +80,7 @@ export function WorkoutClient({
   const [finishing, startFinishing] = useTransition();
   // Taps update the screen straight away; the save catches up in the background.
   const [logs, changeLogs] = useOptimistic(savedLogs, applyLogChange);
-  const [checks, addCheck] = useOptimistic(
-    savedChecks,
-    (current: WarmupCheck[], check: WarmupCheck) => [...current, check],
-  );
+  const [checks, changeChecks] = useOptimistic(savedChecks, applyCheckChange);
   // null = follow the programme order; "review" = the review screen.
   const [focusId, setFocusId] = useState<string | null>(null);
   const workItems = useMemo(() => workItemsOf(items), [items]);
@@ -87,6 +98,20 @@ export function WorkoutClient({
       optimistic();
       await task();
     });
+  }
+
+  function saveTime(item: ProgrammeExercise, durationSeconds: number | null) {
+    const check: WarmupCheck = {
+      sessionId,
+      programmeExerciseId: item.id,
+      durationSeconds,
+      completedAt: new Date().toISOString(),
+    };
+    save(
+      () => changeChecks({ kind: "save", check }),
+      () => checkWarmupAction(sessionId, item.id, durationSeconds),
+    );
+    return applyCheckChange(checks, { kind: "save", check });
   }
 
   if (completed) {
@@ -111,18 +136,7 @@ export function WorkoutClient({
           key={item.id}
           sessionId={sessionId}
           item={item}
-          onDone={(durationSeconds) =>
-            save(
-              () =>
-                addCheck({
-                  sessionId,
-                  programmeExerciseId: item.id,
-                  durationSeconds,
-                  completedAt: new Date().toISOString(),
-                }),
-              () => checkWarmupAction(sessionId, item.id, durationSeconds),
-            )
-          }
+          onDone={(durationSeconds) => saveTime(item, durationSeconds)}
         />
         <SessionFooter sessionId={sessionId} />
       </div>
@@ -141,14 +155,15 @@ export function WorkoutClient({
         <ExerciseChips
           items={workItems}
           logs={logs}
+          checks={checks}
           selectedId={null}
           onSelect={(item) => setFocusId(item.id)}
         />
         <div className="rounded-3xl border border-line bg-card p-5">
           <h2 className="font-display text-3xl text-ink">Review this session</h2>
           <p className="mt-2 text-sm text-muted">
-            {logs.length} of {workItems.length} exercises logged. Tap one above
-            to change it.
+            {workItems.filter((item) => isItemDone(item, logs, checks)).length} of{" "}
+            {workItems.length} exercises logged. Tap one above to change it.
           </p>
           <div className="mt-4">
             <SessionLogList logs={logs} warmups={timedWarmups} />
@@ -168,15 +183,58 @@ export function WorkoutClient({
   }
 
   const current = logFor(logs, focused);
+  const chips = (
+    <ExerciseChips
+      items={workItems}
+      logs={logs}
+      checks={checks}
+      selectedId={focused.id}
+      onSelect={(item) => setFocusId(item.id)}
+    />
+  );
+  const footer = (
+    <>
+      <button
+        type="button"
+        onClick={() => setFocusId("review")}
+        className="w-full rounded-2xl border border-line bg-card px-4 py-4 text-base font-medium text-ink"
+      >
+        Review session
+      </button>
+      <SessionFooter sessionId={sessionId} />
+    </>
+  );
+
+  if (focused.tracksDuration) {
+    const logged = checks.find((check) => check.programmeExerciseId === focused.id);
+    return (
+      <div className="space-y-4">
+        {chips}
+        <TimedCard
+          key={focused.id}
+          sessionId={sessionId}
+          item={focused}
+          loggedSeconds={logged?.durationSeconds ?? null}
+          logged={Boolean(logged)}
+          onSave={(seconds) => {
+            const nextChecks = saveTime(focused, seconds);
+            setFocusId(nextWorkItem(items, logs, nextChecks, focused.id)?.id ?? "review");
+          }}
+          onRemove={() =>
+            save(
+              () => changeChecks({ kind: "remove", programmeExerciseId: focused.id }),
+              () => uncheckAction(sessionId, focused.id),
+            )
+          }
+        />
+        {footer}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      <ExerciseChips
-        items={workItems}
-        logs={logs}
-        selectedId={focused.id}
-        onSelect={(item) => setFocusId(item.id)}
-      />
+      {chips}
       <WorkCard
         key={`${focused.id}-${current ? "logged" : "new"}`}
         item={focused}
@@ -193,8 +251,12 @@ export function WorkoutClient({
             ...entry,
           };
           setFocusId(
-            nextWorkItem(items, applyLogChange(logs, { kind: "save", log }), focused.id)
-              ?.id ?? "review",
+            nextWorkItem(
+              items,
+              applyLogChange(logs, { kind: "save", log }),
+              checks,
+              focused.id,
+            )?.id ?? "review",
           );
           save(
             () => changeLogs({ kind: "save", log }),
@@ -215,14 +277,7 @@ export function WorkoutClient({
           )
         }
       />
-      <button
-        type="button"
-        onClick={() => setFocusId("review")}
-        className="w-full rounded-2xl border border-line bg-card px-4 py-4 text-base font-medium text-ink"
-      >
-        Review session
-      </button>
-      <SessionFooter sessionId={sessionId} />
+      {footer}
     </div>
   );
 }
@@ -265,39 +320,7 @@ function WarmupCard({
       {item.cues ? <p className="mt-3 text-sm leading-6 text-muted">{item.cues}</p> : null}
       {item.notes ? <p className="mt-2 text-sm text-ink">{item.notes}</p> : null}
 
-      {item.tracksDuration ? (
-        <div className="mt-5 space-y-3">
-          <div className="rounded-3xl bg-paper p-4 text-center">
-            <p className="font-mono text-5xl tabular-nums text-ink">
-              {formatClock(timer.seconds)}
-            </p>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={timer.running ? timer.pause : timer.start}
-                className="rounded-2xl bg-electric px-3 py-3 text-base font-medium text-accent-ink"
-              >
-                {timer.running ? "Pause" : timer.seconds > 0 ? "Resume" : "Start timer"}
-              </button>
-              <button
-                type="button"
-                onClick={timer.reset}
-                disabled={timer.seconds === 0}
-                className="rounded-2xl border border-line px-3 py-3 text-base text-ink disabled:opacity-40"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-          <NumberStepper
-            label="Or set minutes"
-            value={Math.round(timer.seconds / 60)}
-            onChange={(minutes) => timer.set(minutes * 60)}
-            step={1}
-            suffix="min"
-          />
-        </div>
-      ) : null}
+      {item.tracksDuration ? <TimerPanel timer={timer} /> : null}
 
       <button
         type="button"
@@ -313,6 +336,102 @@ function WarmupCard({
           : "Done — next"}
       </button>
     </section>
+  );
+}
+
+function TimedCard({
+  sessionId,
+  item,
+  logged,
+  loggedSeconds,
+  onSave,
+  onRemove,
+}: {
+  sessionId: string;
+  item: ProgrammeExercise;
+  logged: boolean;
+  loggedSeconds: number | null;
+  onSave: (seconds: number) => void;
+  onRemove: () => void;
+}) {
+  const timer = useStopwatch(`timer:${sessionId}:${item.id}`);
+
+  return (
+    <section className="space-y-4">
+      <div className="rounded-3xl border border-line bg-card p-5">
+        <ExerciseArt name={item.name} exerciseId={item.exerciseId} size="lg" />
+        <p className="mt-4 text-xs font-medium uppercase tracking-[0.16em] text-muted">
+          Timed
+        </p>
+        <h2 className="mt-2 font-display text-3xl text-ink">{item.name}</h2>
+        {item.cues ? <p className="mt-3 text-sm leading-6 text-ink">{item.cues}</p> : null}
+        {item.notes ? <p className="mt-2 text-sm text-muted">{item.notes}</p> : null}
+        <TimerPanel timer={timer} />
+      </div>
+
+      {logged ? (
+        <div className="flex items-center justify-between gap-3 rounded-3xl border border-line bg-card px-4 py-3">
+          <p className="text-sm text-good">
+            ✓ Logged{" "}
+            <span className="font-mono">
+              {loggedSeconds ? formatDuration(loggedSeconds) : "done"}
+            </span>
+          </p>
+          <button type="button" onClick={onRemove} className="min-h-11 min-w-11 text-sm text-accent">
+            Remove
+          </button>
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        disabled={timer.seconds === 0}
+        onClick={() => {
+          const seconds = timer.seconds;
+          timer.clear();
+          onSave(seconds);
+        }}
+        className="w-full rounded-3xl bg-accent px-4 py-5 text-lg font-medium text-accent-ink disabled:opacity-50"
+      >
+        {timer.seconds === 0
+          ? "Start the timer or set minutes"
+          : `${logged ? "Update" : "Log"} ${formatClock(timer.seconds)}`}
+      </button>
+    </section>
+  );
+}
+
+function TimerPanel({ timer }: { timer: ReturnType<typeof useStopwatch> }) {
+  return (
+    <div className="mt-5 space-y-3">
+      <div className="rounded-3xl bg-paper p-4 text-center">
+        <p className="font-mono text-5xl tabular-nums text-ink">{formatClock(timer.seconds)}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={timer.running ? timer.pause : timer.start}
+            className="rounded-2xl bg-electric px-3 py-3 text-base font-medium text-accent-ink"
+          >
+            {timer.running ? "Pause" : timer.seconds > 0 ? "Resume" : "Start timer"}
+          </button>
+          <button
+            type="button"
+            onClick={timer.reset}
+            disabled={timer.seconds === 0}
+            className="rounded-2xl border border-line px-3 py-3 text-base text-ink disabled:opacity-40"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+      <NumberStepper
+        label="Or set minutes"
+        value={Math.round(timer.seconds / 60)}
+        onChange={(minutes) => timer.set(minutes * 60)}
+        step={1}
+        suffix="min"
+      />
+    </div>
   );
 }
 
@@ -484,11 +603,13 @@ function WorkCard({
 function ExerciseChips({
   items,
   logs,
+  checks,
   selectedId,
   onSelect,
 }: {
   items: ProgrammeExercise[];
   logs: ExerciseLog[];
+  checks: WarmupCheck[];
   selectedId: string | null;
   onSelect: (item: ProgrammeExercise) => void;
 }) {
@@ -498,7 +619,7 @@ function ExerciseChips({
     <div className="-mx-4 overflow-x-auto px-4">
       <div className="flex gap-2 pb-1">
         {items.map((item) => {
-          const done = Boolean(logFor(logs, item));
+          const done = isItemDone(item, logs, checks);
           const selected = item.id === selectedId;
           return (
             <button

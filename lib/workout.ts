@@ -30,10 +30,18 @@ export function logFor<T extends Pick<ExerciseLog, "exerciseId">>(
   return logs.find((log) => log.exerciseId === item.exerciseId) ?? null;
 }
 
+type Logs = Pick<ExerciseLog, "exerciseId">[];
+type Checks = Pick<WarmupCheck, "programmeExerciseId">[];
+
+/** Timed items are done once a time is logged; lifts once weight × reps × sets is. */
+export function isItemDone(item: ProgrammeExercise, logs: Logs, checks: Checks): boolean {
+  return item.tracksDuration ? isWarmupDone(checks, item.id) : Boolean(logFor(logs, item));
+}
+
 export function getWorkoutStep(
   items: ProgrammeExercise[],
-  logs: Pick<ExerciseLog, "exerciseId">[],
-  checks: Pick<WarmupCheck, "programmeExerciseId">[],
+  logs: Logs,
+  checks: Checks,
 ): WorkoutPhase {
   const ordered = [...items].sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -42,22 +50,36 @@ export function getWorkoutStep(
   );
   if (nextWarmup) return { kind: "warmup", item: nextWarmup };
 
-  const nextWork = workItemsOf(ordered).find((item) => !logFor(logs, item));
+  const nextWork = workItemsOf(ordered).find(
+    (item) => !isItemDone(item, logs, checks),
+  );
   if (nextWork) return { kind: "work", item: nextWork };
 
   return { kind: "complete" };
 }
 
-/** The next lift in programme order that is not logged yet, after `currentId`. */
+/** The next item in programme order that is not done yet, after `currentId`. */
 export function nextWorkItem(
   items: ProgrammeExercise[],
-  logs: Pick<ExerciseLog, "exerciseId">[],
+  logs: Logs,
+  checks: Checks,
   currentId: string,
 ): ProgrammeExercise | null {
   const work = workItemsOf(items);
   const index = work.findIndex((item) => item.id === currentId);
   const rotated = [...work.slice(index + 1), ...work.slice(0, Math.max(index, 0))];
-  return rotated.find((item) => !logFor(logs, item)) ?? null;
+  return rotated.find((item) => !isItemDone(item, logs, checks)) ?? null;
+}
+
+/** For rotating programmes: the one done least recently, never-done first. */
+export function upNextProgrammeId(
+  programmeIds: string[],
+  completed: Array<{ programmeId: string; completedAt: string | null }>,
+): string | null {
+  if (programmeIds.length < 2) return null;
+  const lastDone = (id: string) =>
+    completed.find((session) => session.programmeId === id)?.completedAt ?? "";
+  return [...programmeIds].sort((a, b) => lastDone(a).localeCompare(lastDone(b)))[0];
 }
 
 /** The most recent log for this exercise from any other session. */
@@ -115,6 +137,7 @@ export function formatClock(seconds: number): string {
 }
 
 export function prescriptionFor(item: ProgrammeExercise): string {
+  if (item.tracksDuration) return "Timed";
   const sets = item.targetSets ?? DEFAULT_TARGET_SETS;
   return [
     `${sets} ${sets === 1 ? "set" : "sets"}`,

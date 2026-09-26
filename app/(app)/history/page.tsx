@@ -41,7 +41,7 @@ export default async function HistoryPage({
   try {
     const [allSessions, programmes] = await Promise.all([
       getAllSessions(),
-      getProgrammes(),
+      getProgrammes({ includeArchived: true }),
     ]);
     sessions = allSessions;
     programmeNames = new Map(programmes.map((p) => [p.id, p.name]));

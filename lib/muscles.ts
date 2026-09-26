@@ -12,6 +12,11 @@ const MUSCLES: Partial<Record<ExerciseArtKey, string>> = {
   "cable-row": "Upper back",
   "shoulder-press": "Shoulders",
   "pallof-press": "Core",
+  "hip-thrust": "Glutes",
+  "push-up": "Chest",
+  carry: "Grip & core",
+  "dead-bug": "Core",
+  "bird-dog": "Core",
 };
 
 export function muscleFor(
