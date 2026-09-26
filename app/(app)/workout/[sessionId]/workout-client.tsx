@@ -9,6 +9,7 @@ import {
   useTransition,
 } from "react";
 import { ExerciseArt } from "@/components/exercise-art";
+import { BreakGame } from "@/components/break-game";
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import {
   SessionLogList,
@@ -646,17 +647,26 @@ function ExerciseChips({
 }
 
 function SessionFooter({ sessionId }: { sessionId: string }) {
+  const [onBreak, setOnBreak] = useState(false);
   return (
-    <>
-      <form action={finishSessionAction.bind(null, sessionId)} className="pt-2">
+    <div className="flex flex-col items-center gap-4 pt-2 text-center">
+      <button
+        type="button"
+        onClick={() => setOnBreak(true)}
+        className="font-display text-lg uppercase tracking-[0.12em] text-electric underline decoration-electric/40 underline-offset-4"
+      >
+        Take a break
+      </button>
+      <form action={finishSessionAction.bind(null, sessionId)}>
         <SubmitButton
           pendingLabel="Ending…"
-          className="w-full text-sm text-muted underline decoration-line underline-offset-4"
+          className="text-sm text-muted underline decoration-line underline-offset-4"
         >
           End session early
         </SubmitButton>
       </form>
       <DeleteSessionButton sessionId={sessionId} label="Delete this session" />
-    </>
+      {onBreak ? <BreakGame onClose={() => setOnBreak(false)} /> : null}
+    </div>
   );
 }

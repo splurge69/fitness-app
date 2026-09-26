@@ -11,6 +11,7 @@ export function DeleteSessionButton({
 }) {
   return (
     <form
+      className="text-center"
       action={deleteSessionAction.bind(null, sessionId)}
       onSubmit={(event) => {
         if (!window.confirm("Delete this session and its logged sets?")) {
