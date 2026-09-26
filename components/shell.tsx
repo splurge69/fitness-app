@@ -4,7 +4,6 @@ import { logoutAction } from "@/lib/actions/auth";
 const links = [
   { href: "/", label: "Session" },
   { href: "/history", label: "History" },
-  { href: "/programme", label: "Programmes" },
 ] as const;
 
 export function Shell({
@@ -37,7 +36,7 @@ export function Shell({
       </header>
       {children}
       <nav className="fixed inset-x-0 bottom-0 border-t-2 border-accent bg-paper/95 backdrop-blur">
-        <div className="mx-auto grid max-w-lg grid-cols-3">
+        <div className="mx-auto grid max-w-lg grid-cols-2">
           {links.map((link) => (
             <Link
               key={link.href}

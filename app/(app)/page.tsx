@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { SubmitButton } from "@/components/submit-button";
 import { resumeWorkoutAction, startWorkoutAction } from "@/lib/actions/sessions";
@@ -90,13 +89,7 @@ export default async function HomePage() {
         <section className="mt-6">
           <h2 className="font-display text-2xl text-ink">Start a session</h2>
           {programmes.length === 0 ? (
-            <p className="mt-3 text-sm text-muted">
-              No programmes yet.{" "}
-              <Link href="/programme" className="text-ink underline underline-offset-4">
-                Add one
-              </Link>
-              .
-            </p>
+            <p className="mt-3 text-sm text-muted">No programmes yet.</p>
           ) : (
             <ul className="mt-3 space-y-3">
               {programmes.map((programme) => (
