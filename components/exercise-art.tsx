@@ -81,13 +81,14 @@ function Plate({ label, children }: { label: string; children: ReactNode }) {
         <rect x="16" y="63" width="64" height="2" />
         <rect x="16" y="69" width="64" height="3" />
         <rect x="16" y="75.5" width="64" height="4" />
-        <rect x="0" y="80" width="96" height="16" />
+        <rect x="-200" y="80" width="496" height="16" />
       </g>
+      {/* The floor runs past the square so it reaches the edges of wide tiles. */}
       <g stroke="var(--accent)" fill="none" strokeWidth="0.9" opacity="0.6">
-        <path d="M48 80 L8 96 M48 80 L28 96 M48 80 V96 M48 80 L68 96 M48 80 L88 96" />
-        <path d="M0 85.5 H96 M0 91.5 H96" />
+        <path d="M48 80 L-112 96 M48 80 L-72 96 M48 80 L-32 96 M48 80 L8 96 M48 80 L28 96 M48 80 V96 M48 80 L68 96 M48 80 L88 96 M48 80 L128 96 M48 80 L168 96 M48 80 L208 96" />
+        <path d="M-200 85.5 H296 M-200 91.5 H296" />
       </g>
-      <path d="M0 80 H96" stroke="var(--accent)" strokeWidth="1.4" />
+      <path d="M-200 80 H296" stroke="var(--accent)" strokeWidth="1.4" />
       <g filter="url(#art-glow)">{children}</g>
     </svg>
   );

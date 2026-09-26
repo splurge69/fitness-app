@@ -77,6 +77,9 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* Room for the italic overhang, which the text clip would otherwise cut. */
+  padding-right: 0.18em;
+  margin-right: -0.18em;
   filter: drop-shadow(0 2px 0 var(--accent)) drop-shadow(0 0 14px rgba(255, 46, 147, 0.45));
 }
 
