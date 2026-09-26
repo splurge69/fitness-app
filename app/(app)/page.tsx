@@ -3,11 +3,7 @@ import { Shell } from "@/components/shell";
 import { SubmitButton } from "@/components/submit-button";
 import { resumeWorkoutAction, startWorkoutAction } from "@/lib/actions/sessions";
 import { getCompletedSessions, getOpenSession, getProgrammes } from "@/lib/data";
-import {
-  formatHoursSince,
-  getFrequencyStatus,
-  startOfWeek,
-} from "@/lib/frequency";
+import { formatHoursSince, startOfWeek } from "@/lib/frequency";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { describeSupabaseError } from "@/lib/supabase-error";
 import type { Programme, Session } from "@/lib/types";
@@ -128,16 +124,12 @@ function StartButton({
   now: Date;
 }) {
   const last = completed.find((session) => session.programmeId === programme.id);
-  const frequency = getFrequencyStatus({
-    lastCompletedAt: last?.completedAt ? new Date(last.completedAt) : null,
-    sessionsThisWeek: thisWeek.filter(
-      (session) => session.programmeId === programme.id,
-    ).length,
-    now,
-    minHoursBetween: programme.minHoursBetweenSessions,
-    targetPerWeek: programme.targetSessionsPerWeek,
-    minPerWeek: programme.minSessionsPerWeek,
-  });
+  const doneThisWeek = thisWeek.filter(
+    (session) => session.programmeId === programme.id,
+  ).length;
+  const lastDone = last?.completedAt
+    ? formatHoursSince((now.getTime() - new Date(last.completedAt).getTime()) / 36e5)
+    : "never done";
 
   return (
     <form action={startWorkoutAction.bind(null, programme.id)}>
@@ -152,19 +144,8 @@ function StartButton({
           </span>
         </span>
         <span className="mt-1 block text-sm text-muted">
-          {frequency.sessionsThisWeek} / {frequency.targetPerWeek} this week ·{" "}
-          {last ? formatHoursSince(frequency.hoursSinceLast) : "never done"}
+          {doneThisWeek} this week · {lastDone}
         </span>
-        {!frequency.canTrain && frequency.nextEligibleAt ? (
-          <span className="mt-1 block text-sm text-accent">
-            Rest until{" "}
-            {frequency.nextEligibleAt.toLocaleString(undefined, {
-              weekday: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
-        ) : null}
       </SubmitButton>
     </form>
   );

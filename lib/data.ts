@@ -11,9 +11,6 @@ type ProgrammeRow = {
   id: string;
   name: string;
   notes: string | null;
-  min_hours_between_sessions: number;
-  target_sessions_per_week: number;
-  min_sessions_per_week: number;
 };
 
 type ExerciseRow = {
@@ -63,8 +60,7 @@ type WarmupCheckRow = {
   completed_at: string;
 };
 
-const PROGRAMME_COLUMNS =
-  "id, name, notes, min_hours_between_sessions, target_sessions_per_week, min_sessions_per_week";
+const PROGRAMME_COLUMNS = "id, name, notes";
 const SESSION_COLUMNS = "id, programme_id, started_at, completed_at, notes";
 const EXERCISE_LOG_COLUMNS =
   "id, session_id, exercise_id, programme_exercise_id, exercise_name_snapshot, weight_kg, reps, sets, completed_at";
@@ -76,9 +72,6 @@ function mapProgramme(row: ProgrammeRow): Programme {
     id: row.id,
     name: row.name,
     notes: row.notes,
-    minHoursBetweenSessions: row.min_hours_between_sessions,
-    targetSessionsPerWeek: row.target_sessions_per_week,
-    minSessionsPerWeek: row.min_sessions_per_week,
   };
 }
 
@@ -183,16 +176,12 @@ export async function updateProgramme(input: {
   id: string;
   name: string;
   notes: string | null;
-  minHoursBetweenSessions: number;
-  targetSessionsPerWeek: number;
 }): Promise<void> {
   const { error } = await supabaseAdmin()
     .from("programmes")
     .update({
       name: input.name,
       notes: input.notes,
-      min_hours_between_sessions: input.minHoursBetweenSessions,
-      target_sessions_per_week: input.targetSessionsPerWeek,
       updated_at: new Date().toISOString(),
     })
     .eq("id", input.id);

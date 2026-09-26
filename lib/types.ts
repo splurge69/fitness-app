@@ -4,9 +4,6 @@ export type Programme = {
   id: string;
   name: string;
   notes: string | null;
-  minHoursBetweenSessions: number;
-  targetSessionsPerWeek: number;
-  minSessionsPerWeek: number;
 };
 
 export type ProgrammeExercise = {

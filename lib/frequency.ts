@@ -1,22 +1,3 @@
-export type FrequencyInput = {
-  lastCompletedAt: Date | null;
-  sessionsThisWeek: number;
-  now: Date;
-  minHoursBetween: number;
-  targetPerWeek: number;
-  minPerWeek: number;
-};
-
-export type FrequencyStatus = {
-  hoursSinceLast: number | null;
-  nextEligibleAt: Date | null;
-  canTrain: boolean;
-  sessionsThisWeek: number;
-  targetPerWeek: number;
-  minPerWeek: number;
-  weeklyLabel: "on-track" | "behind" | "done";
-};
-
 export function startOfWeek(now: Date): Date {
   const date = new Date(now);
   const day = date.getDay();
@@ -24,39 +5,6 @@ export function startOfWeek(now: Date): Date {
   date.setDate(date.getDate() + mondayOffset);
   date.setHours(0, 0, 0, 0);
   return date;
-}
-
-export function getFrequencyStatus(input: FrequencyInput): FrequencyStatus {
-  const {
-    lastCompletedAt,
-    sessionsThisWeek,
-    now,
-    minHoursBetween,
-    targetPerWeek,
-    minPerWeek,
-  } = input;
-
-  const nextEligibleAt = lastCompletedAt
-    ? new Date(lastCompletedAt.getTime() + minHoursBetween * 60 * 60 * 1000)
-    : null;
-  const hoursSinceLast = lastCompletedAt
-    ? (now.getTime() - lastCompletedAt.getTime()) / (60 * 60 * 1000)
-    : null;
-  const canTrain = !nextEligibleAt || now.getTime() >= nextEligibleAt.getTime();
-
-  let weeklyLabel: FrequencyStatus["weeklyLabel"] = "behind";
-  if (sessionsThisWeek >= targetPerWeek) weeklyLabel = "done";
-  else if (sessionsThisWeek >= minPerWeek) weeklyLabel = "on-track";
-
-  return {
-    hoursSinceLast,
-    nextEligibleAt,
-    canTrain,
-    sessionsThisWeek,
-    targetPerWeek,
-    minPerWeek,
-    weeklyLabel,
-  };
 }
 
 export function formatHoursSince(hours: number | null): string {

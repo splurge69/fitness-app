@@ -52,32 +52,6 @@ export default async function ProgrammePage({
             className="mt-1 w-full rounded-2xl border border-line bg-paper px-3 py-3 text-ink"
           />
         </label>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="block">
-            <span className="text-xs uppercase tracking-[0.14em] text-muted">
-              Rest hours
-            </span>
-            <input
-              name="minHoursBetweenSessions"
-              type="number"
-              min={0}
-              defaultValue={programme.minHoursBetweenSessions}
-              className="mt-1 w-full rounded-2xl border border-line bg-paper px-3 py-3 font-mono text-ink"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs uppercase tracking-[0.14em] text-muted">
-              Per week
-            </span>
-            <input
-              name="targetSessionsPerWeek"
-              type="number"
-              min={1}
-              defaultValue={programme.targetSessionsPerWeek}
-              className="mt-1 w-full rounded-2xl border border-line bg-paper px-3 py-3 font-mono text-ink"
-            />
-          </label>
-        </div>
         <SubmitButton
           pendingLabel="Saving…"
           className="w-full rounded-2xl bg-electric px-3 py-3 text-sm font-medium text-accent-ink"

@@ -111,8 +111,6 @@ export async function saveProgrammeAction(formData: FormData): Promise<void> {
     id,
     name,
     notes: emptyToNull(formData.get("notes")),
-    minHoursBetweenSessions: optionalInt(formData.get("minHoursBetweenSessions")) ?? 0,
-    targetSessionsPerWeek: optionalInt(formData.get("targetSessionsPerWeek")) ?? 1,
   });
 
   revalidatePath("/programme", "layout");
