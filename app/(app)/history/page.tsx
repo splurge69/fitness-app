@@ -145,7 +145,7 @@ export default async function HistoryPage({
                         href={`/workout/${session.id}`}
                         className="text-sm text-ink underline decoration-line underline-offset-4"
                       >
-                        Open session
+                        {session.completedAt ? "Edit session" : "Resume session"}
                       </Link>
                       <DeleteSessionButton sessionId={session.id} />
                     </div>
