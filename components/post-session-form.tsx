@@ -66,7 +66,7 @@ export function PostSessionForm({
               {previousWeight !== null
                 ? `Previous weigh-in: ${previousWeight} kg.`
                 : "Starting weight: 96 kg."}{" "}
-              Confirm today’s weight, or leave blank to skip.
+              Confirm this session’s weight, or leave blank to skip.
             </p>
             <input
               id="post-weight"
