@@ -8,6 +8,9 @@ import {
   useSyncExternalStore,
   useTransition,
 } from "react";
+import { PostSessionForm } from "@/components/post-session-form";
+import { PostSessionSummary } from "@/components/post-session-summary";
+import type { PostSessionLog } from "@/lib/post-session";
 import { ExerciseArt } from "@/components/exercise-art";
 import { BreakGame } from "@/components/break-game";
 import { DeleteSessionButton } from "@/components/delete-session-button";
@@ -66,12 +69,16 @@ export function WorkoutClient({
   sessionId,
   completed,
   items,
+  postSessionLog,
+  previousWeight,
   logs: savedLogs,
   checks: savedChecks,
   history,
 }: {
   sessionId: string;
   completed: boolean;
+  postSessionLog?: PostSessionLog;
+  previousWeight: number | null;
   items: ProgrammeExercise[];
   logs: ExerciseLog[];
   checks: WarmupCheck[];
@@ -118,10 +125,12 @@ export function WorkoutClient({
   if (completed) {
     return (
       <section className="space-y-4">
+        <PostSessionForm sessionId={sessionId} log={postSessionLog} previousWeight={previousWeight} />
         <div className="rounded-3xl border border-line bg-card p-5">
           <h2 className="font-display text-3xl text-ink">That is the session</h2>
           <div className="mt-4">
             <SessionLogList logs={logs} warmups={timedWarmups} />
+            <PostSessionSummary log={postSessionLog} />
           </div>
         </div>
         <DeleteSessionButton sessionId={sessionId} />

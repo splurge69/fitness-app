@@ -1,3 +1,4 @@
+import type { PostSessionLog, PostSessionValues } from "./post-session";
 import { supabaseAdmin } from "./supabase";
 import type {
   ExerciseLog,
@@ -380,5 +381,46 @@ export async function insertWarmupCheck(
     duration_seconds: durationSeconds,
   });
 
+  throwIfError(error);
+}
+
+export async function getPostSessionLogs(sessionIds: string[]): Promise<PostSessionLog[]> {
+  if (sessionIds.length === 0) return [];
+  const { data, error } = await supabaseAdmin()
+    .from("post_session_logs")
+    .select("session_id, weight_kg, activities")
+    .in("session_id", sessionIds);
+  throwIfError(error);
+  return (data ?? []).map((row) => ({
+    sessionId: row.session_id,
+    weightKg: row.weight_kg === null ? null : Number(row.weight_kg),
+    activities: row.activities as PostSessionLog["activities"],
+  }));
+}
+
+/** Use session chronology, so correcting an old weigh-in cannot become the latest. */
+export async function getPreviousBodyWeight(completedAt: string): Promise<number | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("post_session_logs")
+    .select("weight_kg, sessions!inner(completed_at)")
+    .not("weight_kg", "is", null)
+    .lt("sessions.completed_at", completedAt)
+    .order("sessions(completed_at)", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  throwIfError(error);
+  return data ? Number(data.weight_kg) : null;
+}
+
+export async function savePostSessionLog(
+  sessionId: string,
+  values: PostSessionValues,
+): Promise<void> {
+  const { error } = await supabaseAdmin().from("post_session_logs").upsert({
+    session_id: sessionId,
+    weight_kg: values.weightKg,
+    activities: values.activities,
+    updated_at: new Date().toISOString(),
+  });
   throwIfError(error);
 }

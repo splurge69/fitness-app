@@ -98,7 +98,9 @@ export async function uncheckAction(
 export async function finishSessionAction(sessionId: string): Promise<void> {
   await requireSession();
   await completeSession(sessionId);
-  redirect("/");
+  revalidatePath("/history");
+  revalidatePath("/");
+  redirect(`/workout/${sessionId}`);
 }
 
 export async function deleteSessionAction(sessionId: string): Promise<void> {
