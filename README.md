@@ -54,3 +54,21 @@ npm test
 ```
 
 Covers the password gate, session-token signing, last-weight prefill, workout stepper (warm-up → left/right alternating → done), and the 48-hour / weekly frequency helper.
+
+## Optional post-session extras
+
+After completing any programme (including ending early), record body weight in kg,
+extra assault-bike minutes, and sauna minutes. All are optional. Reopen a completed
+session to edit or remove entries; History shows them separately from the programme.
+Weight defaults to the most recent earlier session with a weigh-in, or 96 kg until
+one has been recorded. The default is only saved when you select **Save extras**.
+
+Before deploying this change to an existing Supabase project, run
+[`supabase/migrations/20260928190000_post_session_logs.sql`](supabase/migrations/20260928190000_post_session_logs.sql)
+in the Supabase SQL editor. It adds one table, leaves existing history untouched,
+and is safe to run again. No migration has been applied automatically.
+
+The separate `post_session_logs` model stores one optional weight and a list of
+activities per session. To add another timed activity, add its key, display name
+and description to `POST_SESSION_ACTIVITIES` in `lib/post-session.ts`. The form and
+validation use that list; no programme edits or new database columns are needed.

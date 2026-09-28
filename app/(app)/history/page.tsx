@@ -1,3 +1,5 @@
+import { PostSessionSummary } from "@/components/post-session-summary";
+import type { PostSessionLog } from "@/lib/post-session";
 import Link from "next/link";
 import { DeleteSessionButton } from "@/components/delete-session-button";
 import { HistoryCalendar } from "@/components/history-calendar";
@@ -5,6 +7,7 @@ import { SessionLogList, type TimedWarmup } from "@/components/session-log-list"
 import { Shell } from "@/components/shell";
 import { parseYearMonth, sessionDateKey, sessionsInMonth } from "@/lib/calendar";
 import {
+  getPostSessionLogs,
   getAllSessions,
   getExerciseLogsForSessions,
   getProgrammeItems,
@@ -32,6 +35,7 @@ export default async function HistoryPage({
     );
   }
 
+  let extras: PostSessionLog[];
   let sessions: Session[];
   let visible: Session[];
   let programmeNames: Map<string, string>;
@@ -50,11 +54,13 @@ export default async function HistoryPage({
       : sessionsInMonth(sessions, month);
     const ids = visible.map((session) => session.id);
     const programmeIds = [...new Set(visible.map((s) => s.programmeId))];
-    const [logRows, checkRows, itemLists] = await Promise.all([
+    const [logRows, checkRows, itemLists, postSessionLogs] = await Promise.all([
       getExerciseLogsForSessions(ids),
       getWarmupChecksForSessions(ids),
       Promise.all(programmeIds.map((id) => getProgrammeItems(id))),
+      getPostSessionLogs(ids),
     ]);
+    extras = postSessionLogs;
     logs = logRows;
     checks = checkRows;
     items = itemLists.flat();
@@ -133,6 +139,7 @@ export default async function HistoryPage({
                       warmups={warmups}
                       empty="Nothing logged."
                     />
+                    <PostSessionSummary log={extras.find((log) => log.sessionId === session.id)} />
                     <div className="mt-4 flex items-center gap-4">
                       <Link
                         href={`/workout/${session.id}`}
