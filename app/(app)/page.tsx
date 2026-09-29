@@ -11,6 +11,7 @@ import {
   getOpenSession,
   getProgrammes,
   getProgrammeItems,
+  getProgrammeSessionSummary,
 } from "@/lib/data";
 import { formatHoursSince, startOfWeek } from "@/lib/frequency";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -31,6 +32,7 @@ export default async function HomePage() {
   let openSession: Session | null;
   let completed: Session[];
   let programmeItems: ProgrammeExercise[][];
+  let programmeSummaries: Awaited<ReturnType<typeof getProgrammeSessionSummary>>[];
 
   try {
     [programmes, openSession, completed] = await Promise.all([
@@ -38,9 +40,10 @@ export default async function HomePage() {
       getOpenSession(),
       getCompletedSessions(),
     ]);
-    programmeItems = await Promise.all(
-      programmes.map((programme) => getProgrammeItems(programme.id)),
-    );
+    [programmeItems, programmeSummaries] = await Promise.all([
+      Promise.all(programmes.map((programme) => getProgrammeItems(programme.id))),
+      Promise.all(programmes.map((programme) => getProgrammeSessionSummary(programme.id))),
+    ]);
   } catch (error) {
     console.error("Home data failed", error);
     return (
@@ -117,8 +120,7 @@ export default async function HomePage() {
                   <ProgrammeCard
                     programme={programme}
                     items={programmeItems[index]}
-                    completed={completed}
-                    thisWeek={thisWeek}
+                    summary={programmeSummaries[index]}
                     now={now}
                     upNext={programme.id === upNext}
                   />
@@ -135,27 +137,19 @@ export default async function HomePage() {
 function ProgrammeCard({
   programme,
   items,
-  completed,
-  thisWeek,
+  summary,
   now,
   upNext,
 }: {
   programme: Programme;
   items: ProgrammeExercise[];
-  completed: Session[];
-  thisWeek: Session[];
+  summary: Awaited<ReturnType<typeof getProgrammeSessionSummary>>;
   now: Date;
   upNext: boolean;
 }) {
-  const last = completed.find(
-    (session) => session.programmeId === programme.id,
-  );
-  const doneThisWeek = thisWeek.filter(
-    (session) => session.programmeId === programme.id,
-  ).length;
-  const lastDone = last?.completedAt
+  const lastDone = summary.lastCompletedAt
     ? formatHoursSince(
-        (now.getTime() - new Date(last.completedAt).getTime()) / 36e5,
+        (now.getTime() - new Date(summary.lastCompletedAt).getTime()) / 36e5,
       )
     : "never done";
 
@@ -173,9 +167,8 @@ function ProgrammeCard({
           ) : null}
         </div>
         <p className="shrink-0 pt-1 text-right text-xs leading-5 text-muted">
-          <span className="block sm:inline">{doneThisWeek} this week</span>
-          <span className="hidden sm:inline"> · </span>
-          <span className="block sm:inline">{lastDone}</span>
+          <span className="block">Total sessions: {summary.totalSessions}</span>
+          <span className="block">Last session: {lastDone}</span>
         </p>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
