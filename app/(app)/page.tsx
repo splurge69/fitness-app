@@ -163,17 +163,21 @@ function ProgrammeCard({
     <div
       className={`rounded-3xl border bg-card p-5 ${upNext ? "border-accent" : "border-line"}`}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-lg font-medium text-ink">{programme.name}</h3>
-        {upNext ? (
-          <span className="rounded-sm bg-accent px-1.5 py-0.5 font-display text-xs uppercase tracking-[0.1em] text-accent-ink">
-            Up next
-          </span>
-        ) : null}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-medium text-ink">{programme.name}</h3>
+          {upNext ? (
+            <span className="mt-2 inline-block rounded-sm bg-accent px-1.5 py-0.5 font-display text-xs uppercase tracking-[0.1em] text-accent-ink">
+              Up next
+            </span>
+          ) : null}
+        </div>
+        <p className="shrink-0 pt-1 text-right text-xs leading-5 text-muted">
+          <span className="block sm:inline">{doneThisWeek} this week</span>
+          <span className="hidden sm:inline"> · </span>
+          <span className="block sm:inline">{lastDone}</span>
+        </p>
       </div>
-      <p className="mt-1 text-sm text-muted">
-        {doneThisWeek} this week · {lastDone}
-      </p>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <form action={startWorkoutAction.bind(null, programme.id)}>
           <SubmitButton
