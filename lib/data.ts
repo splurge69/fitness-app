@@ -424,3 +424,22 @@ export async function savePostSessionLog(
   });
   throwIfError(error);
 }
+
+/** Exact lifetime count and latest completion, independent of history pagination. */
+export async function getProgrammeSessionSummary(programmeId: string): Promise<{
+  totalSessions: number;
+  lastCompletedAt: string | null;
+}> {
+  const { data, count, error } = await supabaseAdmin()
+    .from("sessions")
+    .select("completed_at", { count: "exact" })
+    .eq("programme_id", programmeId)
+    .not("completed_at", "is", null)
+    .order("completed_at", { ascending: false })
+    .limit(1);
+  throwIfError(error);
+  return {
+    totalSessions: count ?? 0,
+    lastCompletedAt: data?.[0]?.completed_at ?? null,
+  };
+}
