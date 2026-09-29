@@ -1,12 +1,21 @@
 import Link from "next/link";
+import { ProgrammePreview } from "@/components/programme-preview";
 import { Shell } from "@/components/shell";
 import { SubmitButton } from "@/components/submit-button";
-import { resumeWorkoutAction, startWorkoutAction } from "@/lib/actions/sessions";
-import { getCompletedSessions, getOpenSession, getProgrammes } from "@/lib/data";
+import {
+  resumeWorkoutAction,
+  startWorkoutAction,
+} from "@/lib/actions/sessions";
+import {
+  getCompletedSessions,
+  getOpenSession,
+  getProgrammes,
+  getProgrammeItems,
+} from "@/lib/data";
 import { formatHoursSince, startOfWeek } from "@/lib/frequency";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { describeSupabaseError } from "@/lib/supabase-error";
-import type { Programme, Session } from "@/lib/types";
+import type { Programme, ProgrammeExercise, Session } from "@/lib/types";
 import { upNextProgrammeId } from "@/lib/workout";
 
 export default async function HomePage() {
@@ -21,6 +30,7 @@ export default async function HomePage() {
   let programmes: Programme[];
   let openSession: Session | null;
   let completed: Session[];
+  let programmeItems: ProgrammeExercise[][];
 
   try {
     [programmes, openSession, completed] = await Promise.all([
@@ -28,6 +38,9 @@ export default async function HomePage() {
       getOpenSession(),
       getCompletedSessions(),
     ]);
+    programmeItems = await Promise.all(
+      programmes.map((programme) => getProgrammeItems(programme.id)),
+    );
   } catch (error) {
     console.error("Home data failed", error);
     return (
@@ -99,10 +112,11 @@ export default async function HomePage() {
             <p className="mt-3 text-sm text-muted">No programmes yet.</p>
           ) : (
             <ul className="mt-3 space-y-3">
-              {programmes.map((programme) => (
+              {programmes.map((programme, index) => (
                 <li key={programme.id}>
-                  <StartButton
+                  <ProgrammeCard
                     programme={programme}
+                    items={programmeItems[index]}
                     completed={completed}
                     thisWeek={thisWeek}
                     now={now}
@@ -118,53 +132,60 @@ export default async function HomePage() {
   );
 }
 
-function StartButton({
+function ProgrammeCard({
   programme,
+  items,
   completed,
   thisWeek,
   now,
   upNext,
 }: {
   programme: Programme;
+  items: ProgrammeExercise[];
   completed: Session[];
   thisWeek: Session[];
   now: Date;
   upNext: boolean;
 }) {
-  const last = completed.find((session) => session.programmeId === programme.id);
+  const last = completed.find(
+    (session) => session.programmeId === programme.id,
+  );
   const doneThisWeek = thisWeek.filter(
     (session) => session.programmeId === programme.id,
   ).length;
   const lastDone = last?.completedAt
-    ? formatHoursSince((now.getTime() - new Date(last.completedAt).getTime()) / 36e5)
+    ? formatHoursSince(
+        (now.getTime() - new Date(last.completedAt).getTime()) / 36e5,
+      )
     : "never done";
 
   return (
-    <form action={startWorkoutAction.bind(null, programme.id)}>
-      <SubmitButton
-        pendingLabel="Starting…"
-        className={`w-full rounded-3xl border bg-card px-5 py-4 text-left ${
-          upNext ? "border-accent" : "border-line"
-        }`}
-      >
-        <span className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-2">
-            <span className="text-lg font-medium text-ink">{programme.name}</span>
-            {upNext ? (
-              <span className="rounded-sm bg-accent px-1.5 py-0.5 font-display text-xs uppercase tracking-[0.1em] text-accent-ink">
-                Up next
-              </span>
-            ) : null}
+    <div
+      className={`rounded-3xl border bg-card p-5 ${upNext ? "border-accent" : "border-line"}`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-lg font-medium text-ink">{programme.name}</h3>
+        {upNext ? (
+          <span className="rounded-sm bg-accent px-1.5 py-0.5 font-display text-xs uppercase tracking-[0.1em] text-accent-ink">
+            Up next
           </span>
-          <span className="text-2xl text-ink" aria-hidden>
-            ›
-          </span>
-        </span>
-        <span className="mt-1 block text-sm text-muted">
-          {doneThisWeek} this week · {lastDone}
-        </span>
-      </SubmitButton>
-    </form>
+        ) : null}
+      </div>
+      <p className="mt-1 text-sm text-muted">
+        {doneThisWeek} this week · {lastDone}
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <form action={startWorkoutAction.bind(null, programme.id)}>
+          <SubmitButton
+            pendingLabel="Starting…"
+            className="min-h-12 w-full rounded-2xl bg-electric px-4 py-3 text-sm font-medium text-accent-ink"
+          >
+            Start<span className="sr-only"> {programme.name}</span>
+          </SubmitButton>
+        </form>
+        <ProgrammePreview programme={programme} items={items} />
+      </div>
+    </div>
   );
 }
 
@@ -178,7 +199,9 @@ function SetupCard({ detail }: { detail?: string }) {
             The login gate is working. Add{" "}
             <code className="font-mono text-ink">SUPABASE_URL</code> and the{" "}
             <code className="font-mono text-ink">service_role</code> secret as{" "}
-            <code className="font-mono text-ink">SUPABASE_SERVICE_ROLE_KEY</code>
+            <code className="font-mono text-ink">
+              SUPABASE_SERVICE_ROLE_KEY
+            </code>
             , then paste{" "}
             <code className="font-mono text-ink">supabase/setup.sql</code> into
             the Supabase SQL editor. Do not use the publishable/anon key.
