@@ -4,7 +4,7 @@ A personal rehab log for an evolving ACL programme. Use it on the gym floor to s
 
 ## What it does
 
-- Password gate (one shared password stored in Vercel)
+- Password gate (one shared password stored as a Worker secret)
 - Active programme with warm-ups and working lifts
 - In-session logging: type the kg and reps you actually did, see the live set list, add extra sets, undo a mistype, and alternate left/right on bilateral lifts
 - Matching line plates for each lift, reused on Today, the session screen, History, and the programme editor
@@ -15,14 +15,13 @@ A personal rehab log for an evolving ACL programme. Use it on the gym floor to s
 
 ## Stack
 
-Next.js App Router on Vercel. Supabase Postgres for data. All database access is server-only with the service role key. Row Level Security is on and `anon` / `authenticated` have no table rights.
+Next.js App Router on Cloudflare Workers (via OpenNext), Worker `fitness-app` on George's personal Cloudflare account. Supabase Postgres for data. All database access is server-only with the service role key. Row Level Security is on and `anon` / `authenticated` have no table rights.
 
 ## First-time setup
 
 1. Create a [Supabase](https://supabase.com) project.
 2. Open the SQL editor and paste [`supabase/setup.sql`](supabase/setup.sql). That creates the tables, locks the Data API, and seeds the current ACL programme.
-3. Create a Vercel project from this GitHub repo.
-4. Add these environment variables in Vercel (and locally in `.env.local`):
+3. Add these environment variables as Worker secrets (`npx wrangler secret put NAME`) and locally in `.env.local`:
 
 ```
 APP_PASSWORD=choose-a-password
@@ -35,7 +34,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-secret
 
 `SUPABASE_SERVICE_ROLE_KEY` must be the **secret / service_role** key from Supabase → Project Settings → API. The publishable/anon key cannot read these tables (RLS is on and `anon` has no grants). Do not prefix it with `NEXT_PUBLIC_`.
 
-5. Deploy, open the URL, log in, start a session.
+4. Run `npm run deploy`, open the URL, log in, start a session.
 
 Local development:
 
