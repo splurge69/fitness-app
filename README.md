@@ -15,36 +15,36 @@ A personal rehab log for an evolving ACL programme. Use it on the gym floor to s
 
 ## Stack
 
-Next.js App Router on Cloudflare Workers (via OpenNext), Worker `fitness-app` on George's personal Cloudflare account. Supabase Postgres for data. All database access is server-only with the service role key. Row Level Security is on and `anon` / `authenticated` have no table rights.
+Next.js App Router on Cloudflare Workers (via OpenNext), Worker `fitness-app` on George's personal Cloudflare account. Data lives in the D1 database `fitness-app`, bound to the Worker as `DB`. All database access is server-only (`lib/data.ts`).
 
 ## First-time setup
 
-1. Create a [Supabase](https://supabase.com) project.
-2. Open the SQL editor and paste [`supabase/setup.sql`](supabase/setup.sql). That creates the tables, locks the Data API, and seeds the current ACL programme.
-3. Add these environment variables as Worker secrets (`npx wrangler secret put NAME`) and locally in `.env.local`:
+1. Create the database and its tables: `npx wrangler d1 create fitness-app`, put its id in `wrangler.jsonc`, then `npx wrangler d1 migrations apply fitness-app --remote`.
+2. Add these as Worker secrets (`npx wrangler secret put NAME`) and locally in `.env.local`:
 
 ```
 APP_PASSWORD=choose-a-password
 SESSION_SECRET=at-least-16-random-characters
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-secret
 ```
 
 `SESSION_SECRET` can be generated with `openssl rand -base64 32`.
 
-`SUPABASE_SERVICE_ROLE_KEY` must be the **secret / service_role** key from Supabase → Project Settings → API. The publishable/anon key cannot read these tables (RLS is on and `anon` has no grants). Do not prefix it with `NEXT_PUBLIC_`.
+3. Run `npm run deploy`, open the URL, log in, start a session.
 
-4. Run `npm run deploy`, open the URL, log in, start a session.
+## Programme changes
+
+Add a new numbered SQL file to `migrations/` with fixed UUIDs, then apply it with `npx wrangler d1 migrations apply fitness-app --remote` (and `--local` for development).
 
 Local development:
 
 ```bash
 cp .env.example .env.local
 npm install
+npx wrangler d1 migrations apply fitness-app --local
 npm run dev
 ```
 
-Login works without Supabase. The home screen will ask you to connect the database until the Supabase variables are set.
+`npm run dev` uses a local copy of the D1 database, so it starts empty apart from what the migrations add.
 
 ## Tests
 
@@ -62,10 +62,7 @@ session to edit or remove entries; History shows them separately from the progra
 Weight defaults to the most recent earlier session with a weigh-in, or 96 kg until
 one has been recorded. The default is only saved when you select **Save extras**.
 
-Before deploying this change to an existing Supabase project, run
-[`supabase/migrations/20260928190000_post_session_logs.sql`](supabase/migrations/20260928190000_post_session_logs.sql)
-in the Supabase SQL editor. It adds one table, leaves existing history untouched,
-and is safe to run again. No migration has been applied automatically.
+The table comes from `migrations/0002_post_session_logs.sql`.
 
 The separate `post_session_logs` model stores one optional weight and a list of
 activities per session. To add another timed activity, add its key, display name

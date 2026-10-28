@@ -14,20 +14,11 @@ import {
   getProgrammeSessionSummary,
 } from "@/lib/data";
 import { formatHoursSince, startOfWeek } from "@/lib/frequency";
-import { isSupabaseConfigured } from "@/lib/supabase";
-import { describeSupabaseError } from "@/lib/supabase-error";
+import { describeDataError } from "@/lib/data-error";
 import type { Programme, ProgrammeExercise, Session } from "@/lib/types";
 import { upNextProgrammeId } from "@/lib/workout";
 
 export default async function HomePage() {
-  if (!isSupabaseConfigured()) {
-    return (
-      <Shell>
-        <SetupCard />
-      </Shell>
-    );
-  }
-
   let programmes: Programme[];
   let openSession: Session | null;
   let completed: Session[];
@@ -48,7 +39,7 @@ export default async function HomePage() {
     console.error("Home data failed", error);
     return (
       <Shell>
-        <SetupCard detail={describeSupabaseError(error)} />
+        <SetupCard detail={describeDataError(error)} />
       </Shell>
     );
   }
@@ -186,25 +177,11 @@ function ProgrammeCard({
   );
 }
 
-function SetupCard({ detail }: { detail?: string }) {
+function SetupCard({ detail }: { detail: string }) {
   return (
     <section className="rounded-3xl border border-line bg-card p-5">
-      <h2 className="font-display text-2xl text-ink">Connect Supabase</h2>
-      <p className="mt-3 text-sm leading-6 text-muted">
-        {detail ?? (
-          <>
-            The login gate is working. Add{" "}
-            <code className="font-mono text-ink">SUPABASE_URL</code> and the{" "}
-            <code className="font-mono text-ink">service_role</code> secret as{" "}
-            <code className="font-mono text-ink">
-              SUPABASE_SERVICE_ROLE_KEY
-            </code>
-            , then paste{" "}
-            <code className="font-mono text-ink">supabase/setup.sql</code> into
-            the Supabase SQL editor. Do not use the publishable/anon key.
-          </>
-        )}
-      </p>
+      <h2 className="font-display text-2xl text-ink">Couldn&apos;t load your data</h2>
+      <p className="mt-3 text-sm leading-6 text-muted">{detail}</p>
     </section>
   );
 }

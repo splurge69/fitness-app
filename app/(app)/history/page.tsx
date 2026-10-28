@@ -14,8 +14,7 @@ import {
   getProgrammes,
   getWarmupChecksForSessions,
 } from "@/lib/data";
-import { isSupabaseConfigured } from "@/lib/supabase";
-import { describeSupabaseError } from "@/lib/supabase-error";
+import { describeDataError } from "@/lib/data-error";
 import type { ExerciseLog, ProgrammeExercise, Session, WarmupCheck } from "@/lib/types";
 
 export default async function HistoryPage({
@@ -26,14 +25,6 @@ export default async function HistoryPage({
   const params = await searchParams;
   const month = parseYearMonth(params.month);
   const selectedDay = params.day;
-
-  if (!isSupabaseConfigured()) {
-    return (
-      <Shell title="History">
-        <p className="text-muted">Connect Supabase to see past sessions.</p>
-      </Shell>
-    );
-  }
 
   let extras: PostSessionLog[];
   let sessions: Session[];
@@ -67,7 +58,7 @@ export default async function HistoryPage({
   } catch (error) {
     return (
       <Shell title="History">
-        <p className="text-muted">{describeSupabaseError(error)}</p>
+        <p className="text-muted">{describeDataError(error)}</p>
       </Shell>
     );
   }
